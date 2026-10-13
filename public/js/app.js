@@ -1,7 +1,7 @@
 import { RAW_UNITS } from "./units.js";
 import { createStore } from "./store.js";
 import { US_STATES } from "./us-states.js";
-import { fetchParks, buildList, fetchParkLive, NATIONAL_CAPITAL } from "./nps.js";
+import { fetchParks, buildList, fetchParkLive } from "./nps.js";
 
 /* ---------- reference data ---------- */
 const TYPES = {
@@ -27,10 +27,10 @@ const regionColor = (k) => (k ? `var(--r-${k})` : "var(--ink)");
 const regionName = (k) => (REGIONS.find((r) => r[0] === k) || [])[1] || "";
 const ME = "__me";
 
-// Regions are worked out here rather than trusted from the saved list, so a fix to NATIONAL_CAPITAL applies
-// to an already-refreshed list too.
+// Each site's region comes from its state (National Capital is DC only). It's worked out here rather than
+// trusted from a saved list, so a change to REGIONS applies to an already-refreshed list too.
 const toUnits = (rows) => rows.map(([code, name, type, st, lat, lon]) =>
-  ({ key: code, code, name, type: TYPES[type] ? type : "OTH", st, lat: +lat, lon: +lon, region: NATIONAL_CAPITAL.has(code) ? "NC" : REGION_OF[st] }));
+  ({ key: code, code, name, type: TYPES[type] ? type : "OTH", st, lat: +lat, lon: +lon, region: REGION_OF[st] }));
 // The built-in list, replaced by your own copy once you refresh it from the NPS (see "Update park list").
 let NPS_UNITS = toUnits(RAW_UNITS);
 

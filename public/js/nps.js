@@ -2,10 +2,6 @@
 // "Update park list" page and by tools/fetch-nps-units.mjs.
 import { US_STATES } from "./us-states.js";
 
-// Sites the passport book files under National Capital even though they sit in MD, VA or WV.
-export const NATIONAL_CAPITAL = new Set(["LYBA", "GWMP", "ARHO", "CHOH", "CLBA", "GLEC", "WOTR", "MANA", "HAFE",
-  "ANTI", "MONO", "CATO", "FOWA", "GREE", "PISC", "OXHI", "APPA", "NACC", "NAMA", "ROCR", "WHHO"]);
-
 // The API lists a multi-state park's states alphabetically, so file each site under the state
 // that contains its coordinates. A few long trails and parkways keep a hand-picked home.
 const STATE_FIX = { APPA: "WV", NATR: "MS", BLRI: "NC", LECL: "NE", TRTE: "TN" };
@@ -52,7 +48,6 @@ export function toRow(p) {
     || (here && (states.includes(here) || !states.length) && here) || states[0] || "";
   if (!code || !p.fullName || !st || Number.isNaN(lat) || Number.isNaN(lon)) return null;
   const row = [code, p.fullName.trim(), typeFor(p.designation, p.fullName), st, lat.toFixed(3), lon.toFixed(3)];
-  if (NATIONAL_CAPITAL.has(code)) row.push("NC");
   return row;
 }
 
