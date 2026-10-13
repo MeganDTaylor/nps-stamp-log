@@ -59,6 +59,9 @@ class FirebaseStore {
   update(name, id, data) {
     return this.sdk.fs.updateDoc(this.sdk.fs.doc(this.col(name), id), { ...data, updatedAt: this.sdk.fs.serverTimestamp() });
   }
+  set(name, id, data) {
+    return this.sdk.fs.setDoc(this.sdk.fs.doc(this.col(name), id), { ...data, updatedAt: this.sdk.fs.serverTimestamp() });
+  }
   remove(name, id) { return this.sdk.fs.deleteDoc(this.sdk.fs.doc(this.col(name), id)); }
 }
 
@@ -90,6 +93,9 @@ class LocalStore {
   }
   async update(name, id, data) {
     this.write(name, this.read(name).map((r) => (r.id === id ? { ...r, ...data } : r)));
+  }
+  async set(name, id, data) {
+    this.write(name, [...this.read(name).filter((r) => r.id !== id), { id, ...data }]);
   }
   async remove(name, id) { this.write(name, this.read(name).filter((r) => r.id !== id)); }
 }

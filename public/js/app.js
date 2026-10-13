@@ -65,11 +65,14 @@ function allUnits() {
 }
 const unitByKey = (k) => allUnits().find((u) => u.key === k);
 const visitsFor = (key) => S.visits.filter((v) => v.unit === key).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-const stampsFor = (key) => S.stamps.filter((s) => s.unit === key).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-const has = (u) => S.visits.some((v) => v.unit === u.key) || S.stamps.some((s) => s.unit === u.key && s.got);
-function firstDate(key) {
-  const ds = [...visitsFor(key).map((v) => v.date), ...stampsFor(key).filter((s) => s.got).map((s) => s.date)].filter(Boolean).sort();
-  return ds[0] || "";
+// One stamp per site, stored at stamps/{unit key} with the date it was collected.
+const stampFor = (key) => S.stamps.find((s) => s.id === key);
+const has = (u) => !!stampFor(u.key);
+const firstDate = (key) => stampFor(key)?.date || "";
+async function giveStamp(key, date = todayISO()) {
+  if (stampFor(key)) return;
+  S.fresh = key;
+  await S.store.set("stamps", key, { date });
 }
 function nearPoint() {
   if (S.f.near === ME) return S.here ? { ...S.here, name: "you" } : null;
@@ -149,22 +152,25 @@ function render() {
 }
 
 function unitRow(u, near) {
-  const st = stampsFor(u.key), got = st.filter((s) => s.got).length;
+  const h = has(u);
+  // Tapping an empty circle stamps the site right from the list; everything else opens the park.
+  const mark = el("button", { class: "mark-btn", type: "button", "aria-label": h ? `Stamped ${fmtDate(firstDate(u.key))}` : `Mark ${u.name} as stamped`,
+    title: h ? "Stamped" : "Tap to mark as stamped",
+    onclick: (e) => { e.stopPropagation(); if (h) openSheet(u.key); else giveStamp(u.key).catch(saveFailed); } }, markSVG(u, h));
   return el("li", { class: "unit", tabindex: "0", role: "button", "aria-label": u.name, onclick: () => openSheet(u.key),
-    onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openSheet(u.key); } } },
-    markSVG(u, has(u)),
+    onkeydown: (e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openSheet(u.key); } } },
+    mark,
     el("div", { style: "min-width:0" }, el("div", { class: "nm" }, u.name),
       el("div", { class: "meta" },
         el("span", { class: "tag" + (u.type === "NP" ? " np" : "") }, u.custom ? (u.kind || "Your place") : TYPES[u.type].label),
-        el("span", {}, u.st), u.code ? el("span", {}, u.code) : null,
-        st.length ? el("span", {}, `${got}/${st.length} stamps`) : null)),
+        el("span", {}, u.st), u.code ? el("span", {}, u.code) : null)),
     near ? el("span", { class: "dist" }, u.d < 1 ? "here" : Math.round(u.d) + " mi") : el("span"));
 }
 function renderList(list, near) {
   const box = $("#list");
   if (!list.length) {
-    box.replaceChildren(el("p", { class: "empty-list" }, S.f.status === "have" && !S.visits.length && !S.stamps.length
-      ? "No stamps yet. Switch to All, tap a park, and check off the stamps you have." : "Nothing matches these filters."));
+    box.replaceChildren(el("p", { class: "empty-list" }, S.f.status === "have" && !S.stamps.length
+      ? "No stamps yet. Switch to All and tap the empty circle next to any park you have." : "Nothing matches these filters."));
     return;
   }
   if (near) {
@@ -243,7 +249,7 @@ function renderSheet() {
   if (S.open === "__add") return renderAddPlace();
   const u = unitByKey(S.open);
   if (!u) { closeSheet(); return; }
-  const vs = visitsFor(u.key), st = stampsFor(u.key);
+  const vs = visitsFor(u.key);
   const nearest = hasCoords(u) ? NPS_UNITS.filter((x) => x.key !== u.key).map((x) => ({ ...x, d: miles(u, x) })).sort((a, b) => a.d - b.d).slice(0, 5) : [];
   const mapsQ = hasCoords(u) && !u.custom ? encodeURIComponent(u.name) : encodeURIComponent(`${u.name} ${STATE_NAMES[u.st] || ""}`);
   $("#sheet").replaceChildren(...[
@@ -254,7 +260,7 @@ function renderSheet() {
       u.code ? el("a", { href: `https://www.nps.gov/${u.code.toLowerCase()}/index.htm`, target: "_blank", rel: "noopener" }, "Park website ↗") : null,
       el("a", { href: `https://www.google.com/maps/search/?api=1&query=${mapsQ}`, target: "_blank", rel: "noopener" }, "Directions ↗"),
       S.here && hasCoords(u) ? el("span", { class: "dist" }, `${Math.round(miles(S.here, u))} mi from you`) : null),
-    stampSection(u, st),
+    stampCard(u),
     el("div", { class: "eyebrow" }, vs.length ? `Visit journal (${vs.length})` : "Visit journal"),
     ...vs.map((v) => el("div", { class: "card visit" },
       el("div", { class: "d" }, fmtDate(v.date) + (v.rating ? " · " + v.rating : "")),
@@ -271,34 +277,27 @@ function renderSheet() {
     u.custom ? el("button", { class: "btn danger", type: "button", onclick: (e) => armButton(e.target, "Tap again to remove", async () => {
       try {
         for (const v of visitsFor(u.key)) await S.store.remove("visits", v.id);
-        for (const s of stampsFor(u.key)) await S.store.remove("stamps", s.id);
+        if (stampFor(u.key)) await S.store.remove("stamps", u.key);
         await S.store.remove("places", u.key.slice(2)); closeSheet();
       } catch (x) { saveFailed(x); }
     }) }, "Remove this place") : null,
   ].filter(Boolean));
 }
 
-function stampSection(u, st) {
-  const err = el("div", { class: "err", role: "status" });
-  const input = el("input", { class: "field grow", id: "newStamp", placeholder: st.length ? "Add another stamp" : "Stamp name, e.g. " + (u.code ? "Old Faithful Visitor Center" : "Ranger station"), "aria-label": "New stamp name" });
-  const addStamp = async (name, got) => {
-    if (!name) { err.textContent = "Type the name printed on the stamp."; return; }
-    try { await S.store.add("stamps", { unit: u.key, name, got, date: got ? todayISO() : "" }); S.fresh = u.key; input.value = ""; err.textContent = ""; }
-    catch (x) { saveFailed(x, err); }
-  };
-  return el("div", { class: "card" },
-    el("div", { class: "eyebrow" }, st.length ? `Stamps (${st.filter((s) => s.got).length} of ${st.length})` : "Stamps"),
-    st.length ? null : el("p", { style: "margin:0;font-size:14px;color:var(--muted)" },
-      "Most sites have one main stamp, and big parks have several (one per visitor center, plus special and anniversary stamps). Add each one you see, and check it off when you have it."),
-    st.length ? null : el("button", { class: "btn primary", type: "button", onclick: () => addStamp(u.name, true) }, "I got the main stamp"),
-    st.length ? el("ul", { class: "stamps" }, st.map((s) => el("li", {},
-      el("input", { type: "checkbox", checked: !!s.got, "aria-label": s.name,
-        onchange: (e) => S.store.update("stamps", s.id, { got: e.target.checked, date: e.target.checked ? s.date || todayISO() : "" }).catch(saveFailed) }),
-      el("div", {}, el("div", {}, s.name), s.got && s.date ? el("div", { class: "sd" }, fmtDate(s.date)) : null),
-      el("button", { class: "x", type: "button", "aria-label": "Remove " + s.name, title: "Remove",
-        onclick: (e) => armButton(e.currentTarget, "×?", () => S.store.remove("stamps", s.id).catch(saveFailed)) }, "×")))) : null,
-    el("form", { class: "row", onsubmit: (e) => { e.preventDefault(); addStamp(input.value.trim(), false); } },
-      input, el("button", { class: "btn", type: "submit" }, "Add")),
+function stampCard(u) {
+  const s = stampFor(u.key), err = el("div", { class: "err", role: "status" });
+  if (!s) {
+    return el("div", { class: "card stamp-card" },
+      el("button", { class: "btn primary", type: "button", onclick: () => giveStamp(u.key).catch((x) => saveFailed(x, err)) }, "Got the stamp"),
+      el("span", { class: "hint" }, "Checks it off with today's date. Saving a visit below does this too."), err);
+  }
+  const dateIn = el("input", { class: "field", type: "date", id: "stampDate", value: s.date || "", "aria-label": "Date stamped",
+    onchange: (e) => S.store.set("stamps", u.key, { date: e.target.value || todayISO() }).catch((x) => saveFailed(x, err)) });
+  return el("div", { class: "card stamp-card" },
+    markSVG(u, true),
+    el("div", { style: "display:grid;gap:4px" }, el("strong", {}, "Stamped"), dateIn),
+    el("button", { class: "linkish", type: "button", style: "color:var(--warn);justify-self:end",
+      onclick: (e) => armButton(e.target, "Tap again to unmark", () => S.store.remove("stamps", u.key).catch((x) => saveFailed(x, err))) }, "Unmark"),
     err);
 }
 
@@ -317,6 +316,7 @@ function visitForm(u) {
       const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
       try {
         if (ed) await S.store.update("visits", ed.id, body); else await S.store.add("visits", body);
+        if (!stampFor(u.key)) await giveStamp(u.key, body.date);
         S.editing = null; S.fresh = u.key; renderSheet();
       } catch (x) { saveFailed(x, err); } finally { btn.disabled = false; }
     } },
