@@ -8,8 +8,7 @@ A personal checklist for National Park Service passport stamps. Each person sign
 - **Map view** of every site (filled = have, hollow = still need).
 - **Near me** uses your phone's location to list the closest sites, or pick any park to see what's near it.
 - **Your own places**, such as national forests and state parks, which aren't part of the passport program.
-- **Where to get the stamp:** every stamp location the Park Service lists (1,190+), with where in the building it is, today's hours, directions, and often a photo of the stamp.
-- **Park details:** photo, description and entrance fees.
+- **Where to get the stamp:** every stamp location the Park Service lists (1,190+), with where in the building it is, today's hours and directions.
 - **Live alerts** (closures, cautions) on each park page once you've saved your NPS API key.
 - **Update park list** from the National Park Service with your own API key, whenever you like.
 
@@ -94,13 +93,13 @@ Then fill in any non-empty `apiKey` with `projectId: "demo-stamptrail"` and set 
 
 ## The park list
 
-The built-in list (`public/js/units.js`, 474 sites) and park details with stamp locations (`public/data/park-info.json`) come from the official [NPS Data API](https://www.nps.gov/subjects/developer/api-documentation.htm).
+The built-in list (`public/js/units.js`, 474 sites) and where to get each stamp (`public/data/park-info.json`) come from the official [NPS Data API](https://www.nps.gov/subjects/developer/api-documentation.htm).
 
 **Refreshing it from the app:** tap **Update park list** at the bottom of the page, paste your NPS API key once, and tap **Refresh park list**. The app downloads the latest sites, saves your copy to your account (`users/{uid}/meta/units`), and tells you what was added or removed. Your key is saved privately to your account (`users/{uid}/meta/settings`). Stamps and journal entries are tied to park codes, so a refresh never loses them.
 
 **Park pages with your key:** when you open a park, the app fetches that park's stamp locations, visitor center hours and alerts live (4 small requests, cached for 30 minutes). Without a key, park pages use the built-in copy and skip alerts.
 
-**Refreshing the built-in list and park details** (what everyone starts with):
+**Refreshing the built-in list and stamp locations** (what everyone starts with):
 
 ```sh
 echo "NPS_API_KEY=your-key" > .env     # .env is git-ignored

@@ -80,7 +80,7 @@ export async function fetchAll(key, endpoint, onProgress, params = "") {
 }
 export const fetchParks = (key, onProgress) => fetchAll(key, "parks", onProgress);
 
-/* ---------- park details: photo, description, fees, and where the stamps are ---------- */
+/* ---------- where to get each park's stamp ---------- */
 const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const clip = (s, n) => { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, s.lastIndexOf(" ", n)) + "…" : s; };
 
@@ -91,8 +91,6 @@ function stampSpot(loc, vc, code) {
     if (!Number.isNaN(lat) && !Number.isNaN(lon)) { spot.lat = +lat.toFixed(5); spot.lon = +lon.toFixed(5); }
     if (vc.url) spot.url = vc.url;
     if (vc.passportStampLocationDescription) spot.where = clip(vc.passportStampLocationDescription, 220);
-    const img = vc.passportStampImages?.[0]?.url;
-    if (img) spot.simg = img;
     const oh = vc.operatingHours?.[0];
     if (oh?.standardHours) spot.hours = DAYS.map((d) => oh.standardHours[d] || "");
     else if (oh?.description) spot.hoursNote = clip(oh.description, 160);
@@ -101,26 +99,19 @@ function stampSpot(loc, vc, code) {
   return spot;
 }
 
-// One entry per park code: { d, img, fees, url, stamps: [...] }
+// One entry per park code: { url, stamps: [...] }
 export function buildParkInfo(parks, stampLocations, visitorCenters) {
   const vcById = new Map(visitorCenters.map((v) => [v.id, v]));
   const info = {};
   for (const p of parks) {
     const code = String(p.parkCode || "").toUpperCase();
     if (!code) continue;
-    const img = p.images?.[0];
-    info[code] = {
-      d: clip(p.description, 420),
-      url: p.url || "",
-      img: img?.url ? { u: img.url, a: img.altText || img.title || "", c: img.credit || "" } : null,
-      fees: (p.entranceFees || []).filter((f) => f.title).slice(0, 3).map((f) => [f.title.replace(/^Entrance - /, ""), Number(f.cost) || 0]),
-      stamps: [],
-    };
+    info[code] = { url: p.url || "", stamps: [] };
   }
   for (const loc of stampLocations) {
     for (const park of loc.parks || []) {
       const code = String(park.parkCode || "").toUpperCase();
-      (info[code] ||= { d: "", url: park.url || "", img: null, fees: [], stamps: [] }).stamps.push(stampSpot(loc, vcById.get(loc.id), code));
+      (info[code] ||= { url: park.url || "", stamps: [] }).stamps.push(stampSpot(loc, vcById.get(loc.id), code));
     }
   }
   for (const v of Object.values(info)) v.stamps.sort((a, b) => (a.closed ? 1 : 0) - (b.closed ? 1 : 0) || a.n.localeCompare(b.n));

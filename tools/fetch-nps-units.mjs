@@ -1,4 +1,4 @@
-// Rebuilds the built-in park list (public/js/units.js) and park details with stamp locations
+// Rebuilds the built-in park list (public/js/units.js) and where to get each stamp
 // (public/data/park-info.json) from the official NPS Data API.
 // You can also refresh your own list from inside the app: "Update park list" at the bottom of the page.
 //
@@ -46,7 +46,7 @@ async function main() {
   const spots = Object.values(info).reduce((n, v) => n + v.stamps.length, 0);
 
   console.log(`Wrote ${rows.length} sites to public/js/units.js (the API listed ${parks.length}).`);
-  console.log(`Wrote park details and ${spots} stamp locations to public/data/park-info.json (${Math.round(JSON.stringify(info).length / 1024)} KB).`);
+  console.log(`Wrote ${spots} stamp locations to public/data/park-info.json (${Math.round(JSON.stringify(info).length / 1024)} KB).`);
   if (added.length) console.log(`\nNew since last list (${added.length}):\n  ` + added.join("\n  "));
   if (removed.length) console.log(`\nNo longer listed (${removed.length}): ${removed.join(", ")}`);
   if (skipped.length) console.log(`\nSkipped, missing a state or location (${skipped.length}):\n  ` + skipped.join("\n  "));

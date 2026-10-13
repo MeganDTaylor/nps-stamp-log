@@ -289,7 +289,6 @@ function renderSheet() {
     alertsSection(u),
     stampCard(u),
     whereSection(u),
-    aboutSection(u),
     el("div", { class: "eyebrow" }, vs.length ? `Visit journal (${vs.length})` : "Visit journal"),
     ...vs.map((v) => el("div", { class: "card visit" },
       el("div", { class: "d" }, fmtDate(v.date) + (v.rating ? " · " + v.rating : "")),
@@ -386,7 +385,7 @@ function renderAddPlace() {
     f);
 }
 
-/* ---------- park details ---------- */
+/* ---------- where to get the stamp, and alerts ---------- */
 async function loadInfo() {
   if (S.infoState !== "idle") return;
   S.infoState = "loading";
@@ -408,7 +407,7 @@ function loadLive(code) {
     .catch((e) => { S.live[code] = { state: "error", at: Date.now(), msg: e.message }; })
     .finally(() => { if (S.open === code) renderSheet(); });
 }
-// Live details when you have a key, otherwise the copy that ships with the app.
+// Live stamp locations when you have a key, otherwise the copy that ships with the app.
 const infoFor = (u) => (u.code ? S.live[u.code]?.info || S.info?.[u.code] || null : null);
 
 function alertsSection(u) {
@@ -450,7 +449,6 @@ function whereSection(u) {
 function spotItem(u, s) {
   const today = s.hours?.[todayIdx()];
   const dir = s.lat != null ? `${s.lat},${s.lon}` : `${s.n} ${u.name}`;
-  const img = s.simg ? el("img", { class: "stamp-img", src: s.simg, alt: `The ${s.n} stamp`, loading: "lazy", onerror: (e) => e.target.remove() }) : null;
   return el("li", { class: "spot" + (s.closed ? " closed" : "") },
     el("div", { class: "spot-body" },
       el("div", { class: "spot-name" }, s.n.replace(/\s*\(Temporarily Closed\)/i, ""), s.closed ? el("span", { class: "tag warn" }, "Temporarily closed") : null),
@@ -458,20 +456,8 @@ function spotItem(u, s) {
       today ? el("div", { class: "spot-hours" }, `Today: ${today}`) : s.hoursNote ? el("div", { class: "spot-hours" }, s.hoursNote) : null,
       el("div", { class: "row spot-links" },
         el("a", { href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dir)}`, target: "_blank", rel: "noopener" }, "Directions ↗"),
-        s.url ? el("a", { href: s.url, target: "_blank", rel: "noopener" }, "Hours & info ↗") : null)),
-    img);
+        s.url ? el("a", { href: s.url, target: "_blank", rel: "noopener" }, "Hours & info ↗") : null)));
 }
-function aboutSection(u) {
-  const info = infoFor(u);
-  if (!info || !(info.d || info.img || info.fees.length)) return null;
-  return el("div", { class: "card about" },
-    info.img ? el("figure", {}, el("img", { src: info.img.u, alt: info.img.a, loading: "lazy", onerror: (e) => e.target.closest("figure").remove() }),
-      info.img.c ? el("figcaption", {}, info.img.c) : null) : null,
-    info.d ? el("p", {}, info.d) : null,
-    info.fees.length ? el("div", { class: "fees" }, el("div", { class: "eyebrow" }, "Entrance fees"),
-      info.fees.map(([t, c]) => el("div", { class: "fee" }, el("span", {}, t), el("span", { class: "dist" }, c ? `$${c % 1 ? c.toFixed(2) : c}` : "Free")))) : null);
-}
-
 /* ---------- park list from the NPS ---------- */
 function renderListSettings() {
   const status = el("div", { class: "hint", role: "status" });
