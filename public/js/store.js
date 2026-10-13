@@ -1,5 +1,6 @@
-// Data layer. Two backends with the same shape:
+// Data layer. Three backends with the same shape:
 //   FirebaseStore — Firebase Auth + Firestore, data under users/{uid}/...
+//   ArtifactStore — the claude.ai preview page, data in the viewer's private artifact storage.
 //   LocalStore    — demo mode, saves to localStorage, no sign-in.
 // Collections used by the app: "visits", "stamps", "places".
 import { firebaseConfig, useEmulators } from "./firebase-config.js";
@@ -8,6 +9,11 @@ const SDK = "https://www.gstatic.com/firebasejs/10.12.2";
 
 export async function createStore() {
   if (firebaseConfig.apiKey) return new FirebaseStore(await loadFirebase());
+  if (window.claude?.use) {
+    const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    const uid = db && user ? await user.id() : null;
+    if (uid) return new ArtifactStore(db, uid);
+  }
   return new LocalStore();
 }
 
@@ -63,6 +69,27 @@ class FirebaseStore {
     return this.sdk.fs.setDoc(this.sdk.fs.doc(this.col(name), id), { ...data, updatedAt: this.sdk.fs.serverTimestamp() });
   }
   remove(name, id) { return this.sdk.fs.deleteDoc(this.sdk.fs.doc(this.col(name), id)); }
+}
+
+class ArtifactStore {
+  constructor(db, uid) {
+    this.mode = "artifact";
+    this.uid = uid;
+    // data/users/<id>/ is private to each viewer.
+    this.root = db.doc(`data/users/${uid}/passport`);
+  }
+  onAuth(cb) { setTimeout(() => cb({ uid: this.uid, email: "", name: "" }), 0); return () => {}; }
+  signOut() {}
+  subscribe(name, cb, onError) {
+    return this.root.collection(name).onSnapshot((s) => cb(s.docs.map((d) => ({ id: d.id, ...d.data() }))), onError);
+  }
+  async add(name, data) {
+    const ref = await this.root.collection(name).add({ ...data, createdAt: new Date().toISOString() });
+    return ref.id;
+  }
+  update(name, id, data) { return this.root.collection(name).doc(id).update(data); }
+  set(name, id, data) { return this.root.collection(name).doc(id).set(data); }
+  remove(name, id) { return this.root.collection(name).doc(id).delete(); }
 }
 
 class LocalStore {

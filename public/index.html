@@ -46,39 +46,44 @@
   <div id="app" hidden>
     <section class="summary" id="summary" aria-label="Progress by region"></section>
 
-    <section class="filters" aria-label="Filters">
+    <section class="filters" aria-label="Search and filters">
       <div class="row">
         <input id="q" class="field" type="search" placeholder="Search parks, states, codes…" aria-label="Search">
-        <select id="state" class="field" aria-label="State"><option value="">All states</option></select>
+        <button class="btn filter-toggle" id="filterToggle" type="button" aria-expanded="false" aria-controls="filterPanel">Filters<span class="badge" id="filterCount" hidden></span></button>
         <div class="seg" id="view" role="group" aria-label="View">
           <button data-v="list" aria-pressed="true">List</button>
           <button data-v="map" aria-pressed="false">Map</button>
         </div>
       </div>
-      <div class="row">
-        <div class="seg" id="status" role="group" aria-label="Status">
-          <button data-v="all" aria-pressed="true">All</button>
-          <button data-v="need" aria-pressed="false">Still need</button>
-          <button data-v="have" aria-pressed="false">Have</button>
+      <div class="filter-panel" id="filterPanel" hidden>
+        <div class="row">
+          <select id="state" class="field" aria-label="State"><option value="">All states</option></select>
+          <div class="seg" id="status" role="group" aria-label="Status">
+            <button data-v="all" aria-pressed="true">All</button>
+            <button data-v="need" aria-pressed="false">Still need</button>
+            <button data-v="have" aria-pressed="false">Have</button>
+          </div>
         </div>
         <div class="seg" id="types" role="group" aria-label="Site type"></div>
+        <div class="row">
+          <label for="near" class="eyebrow">Near</label>
+          <button class="btn" id="locateBtn" type="button">Use my location</button>
+          <input id="near" class="field grow" list="nearList" placeholder="…or pick a park">
+          <datalist id="nearList"></datalist>
+          <select id="radius" class="field" aria-label="Distance">
+            <option value="50">within 50 mi</option><option value="100">within 100 mi</option>
+            <option value="250" selected>within 250 mi</option><option value="500">within 500 mi</option><option value="99999">any distance</option>
+          </select>
+        </div>
       </div>
-      <div class="row">
-        <label for="near" class="eyebrow">Near</label>
-        <button class="btn" id="locateBtn" type="button">Use my location</button>
-        <input id="near" class="field grow" list="nearList" placeholder="…or pick a park">
-        <datalist id="nearList"></datalist>
-        <select id="radius" class="field" aria-label="Distance">
-          <option value="50">within 50 mi</option><option value="100">within 100 mi</option>
-          <option value="250" selected>within 250 mi</option><option value="500">within 500 mi</option><option value="99999">any distance</option>
-        </select>
-        <button class="btn" id="clearNear" type="button" hidden>Clear</button>
+      <div class="row active-row">
+        <div class="active" id="activeFilters"></div>
         <span class="count" id="count"></span>
       </div>
     </section>
 
     <div id="mapWrap" hidden><div id="map" role="region" aria-label="Map of park sites"></div>
-      <div class="legend"><span><i class="dot have"></i>Have</span><span><i class="dot need"></i>Still need</span><span><i class="dot custom"></i>Your places</span><span><i class="dot me"></i>You</span></div>
+      <div class="legend"><span><i class="dot have"></i>Have</span><span><i class="dot need"></i>Still need</span><span><i class="dot me"></i>You</span><span>Dot colors match the passport regions</span></div>
     </div>
     <main id="list"></main>
 

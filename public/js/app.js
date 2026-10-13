@@ -1,5 +1,6 @@
 import { RAW_UNITS } from "./units.js";
 import { createStore } from "./store.js";
+import { US_STATES } from "./us-states.js";
 
 /* ---------- reference data ---------- */
 const TYPES = {
@@ -20,6 +21,9 @@ const REGIONS = [
 const REGION_OF = {};
 REGIONS.forEach(([k, , s]) => s.split(" ").forEach((st) => (REGION_OF[st] = k)));
 const STATE_NAMES = { AK: "Alaska", AL: "Alabama", AR: "Arkansas", AS: "American Samoa", AZ: "Arizona", CA: "California", CO: "Colorado", CT: "Connecticut", DC: "District of Columbia", DE: "Delaware", FL: "Florida", GA: "Georgia", GU: "Guam", HI: "Hawaiʻi", IA: "Iowa", ID: "Idaho", IL: "Illinois", IN: "Indiana", KS: "Kansas", KY: "Kentucky", LA: "Louisiana", MA: "Massachusetts", MD: "Maryland", ME: "Maine", MI: "Michigan", MN: "Minnesota", MO: "Missouri", MP: "Northern Mariana Islands", MS: "Mississippi", MT: "Montana", NC: "North Carolina", ND: "North Dakota", NE: "Nebraska", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NV: "Nevada", NY: "New York", OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", PR: "Puerto Rico", RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VA: "Virginia", VI: "U.S. Virgin Islands", VT: "Vermont", WA: "Washington", WI: "Wisconsin", WV: "West Virginia", WY: "Wyoming" };
+// Region colors live in css/app.css as --r-NA, --r-MA, ... so they can be matched to the passport book in one place.
+const regionColor = (k) => (k ? `var(--r-${k})` : "var(--ink)");
+const regionName = (k) => (REGIONS.find((r) => r[0] === k) || [])[1] || "";
 const RATINGS = ["Quick stop", "Good", "Great", "Unforgettable"];
 const ME = "__me";
 
@@ -94,10 +98,11 @@ function markSVG(u, stamped) {
   const svg = svgEl("svg", { viewBox: "0 0 50 50", class: "mark" + (S.fresh === u.key ? " fresh" : ""), role: "img", "aria-label": stamped ? "Stamped" : "Not yet" });
   const rot = ((u.key.charCodeAt(0) * 7 + u.key.charCodeAt(u.key.length - 1) * 3) % 21) - 10;
   const g = svgEl("g", { transform: `rotate(${stamped ? rot : 0} 25 25)` });
-  const ring = (r, dash) => svgEl("circle", { cx: 25, cy: 25, r, fill: "none", stroke: stamped ? "var(--ink)" : "var(--line)", "stroke-width": dash ? 1.5 : 2, ...(dash ? { "stroke-dasharray": "3 3" } : {}) });
+  const ink = regionColor(u.region);
+  const ring = (r, dash) => svgEl("circle", { cx: 25, cy: 25, r, fill: "none", stroke: stamped ? ink : "var(--line)", "stroke-width": dash ? 1.5 : 2, ...(dash ? { "stroke-dasharray": "3 3" } : {}) });
   if (stamped) {
-    const t = svgEl("text", { x: 25, y: 24, "text-anchor": "middle", "font-size": 9, fill: "var(--ink)" }); t.textContent = u.code || "★";
-    const d = svgEl("text", { x: 25, y: 34, "text-anchor": "middle", "font-size": 6.5, fill: "var(--ink)" }); d.textContent = firstDate(u.key).slice(2).replace(/-/g, ".");
+    const t = svgEl("text", { x: 25, y: 24, "text-anchor": "middle", "font-size": 9, fill: ink }); t.textContent = u.code || "★";
+    const d = svgEl("text", { x: 25, y: 34, "text-anchor": "middle", "font-size": 6.5, fill: ink }); d.textContent = firstDate(u.key).slice(2).replace(/-/g, ".");
     g.append(ring(22), ring(17, true), t, d);
   } else g.append(ring(21, true));
   svg.append(g);
@@ -136,14 +141,13 @@ function render() {
   drawBigStamp(haveN, NPS_UNITS.length);
   $("#summary").replaceChildren(...REGIONS.map(([k, name]) => {
     const us = NPS_UNITS.filter((u) => u.region === k), h = us.filter(has).length;
-    return el("button", { class: "region", "aria-pressed": S.f.region === k ? "true" : "false", onclick: () => { S.f.region = S.f.region === k ? "" : k; render(); } },
+    return el("button", { class: "region", style: `--rc:${regionColor(k)}`, "aria-pressed": S.f.region === k ? "true" : "false", onclick: () => { S.f.region = S.f.region === k ? "" : k; render(); } },
       el("span", { class: "name" }, name), el("span", { class: "num" }, `${h} / ${us.length}`),
       el("span", { class: "bar" }, el("i", { style: `width:${us.length ? (h / us.length) * 100 : 0}%` })));
   }));
   const { list, near } = filtered();
-  const region = S.f.region ? " in " + REGIONS.find((r) => r[0] === S.f.region)[1] : "";
-  $("#count").textContent = `${list.length} site${list.length === 1 ? "" : "s"}${region}`;
-  $("#clearNear").hidden = !S.f.near;
+  $("#count").textContent = `${list.length} site${list.length === 1 ? "" : "s"}`;
+  renderActiveFilters();
   $("#mapWrap").hidden = S.view !== "map";
   $("#list").hidden = S.view !== "list";
   if (S.view === "map") renderMap(list);
@@ -157,13 +161,14 @@ function unitRow(u, near) {
   const mark = el("button", { class: "mark-btn", type: "button", "aria-label": h ? `Stamped ${fmtDate(firstDate(u.key))}` : `Mark ${u.name} as stamped`,
     title: h ? "Stamped" : "Tap to mark as stamped",
     onclick: (e) => { e.stopPropagation(); if (h) openSheet(u.key); else giveStamp(u.key).catch(saveFailed); } }, markSVG(u, h));
-  return el("li", { class: "unit", tabindex: "0", role: "button", "aria-label": u.name, onclick: () => openSheet(u.key),
+  return el("li", { class: "unit", style: `--rc:${regionColor(u.region)}`, tabindex: "0", role: "button", "aria-label": u.name, onclick: () => openSheet(u.key),
     onkeydown: (e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openSheet(u.key); } } },
     mark,
     el("div", { style: "min-width:0" }, el("div", { class: "nm" }, u.name),
       el("div", { class: "meta" },
         el("span", { class: "tag" + (u.type === "NP" ? " np" : "") }, u.custom ? (u.kind || "Your place") : TYPES[u.type].label),
-        el("span", {}, u.st), u.code ? el("span", {}, u.code) : null)),
+        u.region ? el("span", { class: "rdot", style: `--rc:${regionColor(u.region)}` }, regionName(u.region)) : null,
+        u.code ? el("span", {}, u.code) : null)),
     near ? el("span", { class: "dist" }, u.d < 1 ? "here" : Math.round(u.d) + " mi") : el("span"));
 }
 function renderList(list, near) {
@@ -182,14 +187,21 @@ function renderList(list, near) {
   const keys = Object.keys(by).sort((a, b) => (STATE_NAMES[a] || a).localeCompare(STATE_NAMES[b] || b));
   box.replaceChildren(...keys.flatMap((st) => {
     const us = by[st].sort((a, b) => a.name.localeCompare(b.name)), h = us.filter(has).length;
-    return [el("div", { class: "group-h" }, el("h2", {}, STATE_NAMES[st] || st || "Other"), el("span", {}, `${h}/${us.length}`)),
+    const rk = REGION_OF[st] || us[0].region;
+    return [el("div", { class: "group-h", style: `--rc:${regionColor(rk)}` }, el("h2", {}, STATE_NAMES[st] || st || "Other"), el("span", {}, `${h}/${us.length}`),
+        rk ? el("span", { class: "rdot" }, regionName(rk)) : null),
       el("ul", { class: "units" }, us.map((u) => unitRow(u, false)))];
   }));
 }
 
 /* ---------- map ---------- */
-let map = null, markerLayer = null, meMarker = null, lastFitKey = "";
+let map = null, stateLayer = null, markerLayer = null, meMarker = null, lastFitKey = "";
 function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function stateStyle(f) {
+  const c = cssVar(`--r-${REGION_OF[f.properties.st]}`) || cssVar("--muted");
+  const on = !S.f.region || REGION_OF[f.properties.st] === S.f.region;
+  return { color: c, weight: 1, opacity: 0.7, fillColor: c, fillOpacity: on ? 0.14 : 0.04 };
+}
 function renderMap(list) {
   if (!window.L) { $("#map").textContent = "The map couldn't load. Check your connection and reload."; return; }
   if (!map) {
@@ -197,27 +209,30 @@ function renderMap(list) {
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
+    // State outlines tinted by passport region. They also stand in for the map tiles if those can't load.
+    stateLayer = L.geoJSON(US_STATES, { interactive: false, style: stateStyle }).addTo(map);
     markerLayer = L.layerGroup().addTo(map);
   }
+  stateLayer.setStyle(stateStyle);
   setTimeout(() => map.invalidateSize(), 0);
   markerLayer.clearLayers();
-  const ink = cssVar("--ink"), surface = cssVar("--surface"), custom = cssVar("--custom");
+  const surface = cssVar("--surface");
   const pts = [];
   list.filter(hasCoords).forEach((u) => {
-    const h = has(u);
+    const h = has(u), c = cssVar(`--r-${u.region}`) || cssVar("--ink");
     const m = L.circleMarker([u.lat, u.lon], {
-      radius: u.type === "NP" ? 8 : 6, weight: 2,
-      color: u.custom ? custom : ink, fillColor: u.custom ? custom : h ? ink : surface, fillOpacity: 1,
+      radius: u.type === "NP" ? 8 : 6, weight: u.custom ? 3 : 2, dashArray: u.custom ? "2 3" : null,
+      color: c, fillColor: h ? c : surface, fillOpacity: 1,
     });
     const btn = el("button", { class: "linkish", type: "button", onclick: () => openSheet(u.key) }, h ? "Open" : "Open and check off");
-    m.bindPopup(el("div", {}, el("b", {}, u.name), el("div", {}, `${u.custom ? u.kind || "Your place" : TYPES[u.type].label} · ${u.st}`), btn));
+    m.bindPopup(el("div", {}, el("b", {}, u.name), el("div", {}, `${u.custom ? u.kind || "Your place" : TYPES[u.type].label} · ${u.st} · ${regionName(u.region)}`), btn));
     m.bindTooltip(u.name);
     markerLayer.addLayer(m);
     pts.push([u.lat, u.lon]);
   });
   if (meMarker) meMarker.remove();
   if (S.here) {
-    meMarker = L.circleMarker([S.here.lat, S.here.lon], { radius: 7, weight: 3, color: "#fff", fillColor: "#d33", fillOpacity: 1 }).bindTooltip("You are here").addTo(map);
+    meMarker = L.circleMarker([S.here.lat, S.here.lon], { radius: 8, weight: 3, color: cssVar("--surface"), fillColor: cssVar("--fg"), fillOpacity: 1 }).bindTooltip("You are here").addTo(map);
     pts.push([S.here.lat, S.here.lon]);
   }
   // Refit only when the filter set changes, so panning around isn't undone by every save.
@@ -254,7 +269,9 @@ function renderSheet() {
   const mapsQ = hasCoords(u) && !u.custom ? encodeURIComponent(u.name) : encodeURIComponent(`${u.name} ${STATE_NAMES[u.st] || ""}`);
   $("#sheet").replaceChildren(...[
     el("button", { class: "btn close", type: "button", onclick: closeSheet }, "Close"),
-    el("div", {}, el("div", { class: "eyebrow" }, [u.custom ? u.kind || "Your place" : TYPES[u.type].label, STATE_NAMES[u.st] || u.st, u.code].filter(Boolean).join(" · ")),
+    el("div", { class: "sheet-head", style: `--rc:${regionColor(u.region)}` },
+      u.region ? el("span", { class: "rdot" }, regionName(u.region) + " region") : null,
+      el("div", { class: "eyebrow" }, [u.custom ? u.kind || "Your place" : TYPES[u.type].label, STATE_NAMES[u.st] || u.st, u.code].filter(Boolean).join(" · ")),
       el("h3", { id: "sheetTitle", style: "margin-top:6px" }, u.name)),
     el("div", { class: "row" },
       u.code ? el("a", { href: `https://www.nps.gov/${u.code.toLowerCase()}/index.htm`, target: "_blank", rel: "noopener" }, "Park website ↗") : null,
@@ -386,11 +403,39 @@ function setupControls() {
   $("#view").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; setView(b.dataset.v); });
   $("#near").addEventListener("change", (e) => { const u = allUnits().find((x) => x.name === e.target.value); S.f.near = u ? u.key : null; resetLocateBtn(); render(); });
   $("#radius").addEventListener("change", (e) => { S.f.radius = +e.target.value; render(); });
-  $("#clearNear").addEventListener("click", () => { S.f.near = null; $("#near").value = ""; resetLocateBtn(); render(); });
+  $("#filterToggle").addEventListener("click", () => setFiltersOpen($("#filterPanel").hidden));
   $("#locateBtn").addEventListener("click", locate);
   $("#scrim").addEventListener("click", closeSheet);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.open) closeSheet(); });
   $("#addPlaceBtn").addEventListener("click", () => { S.open = "__add"; renderSheet(); $("#sheet").hidden = false; $("#scrim").hidden = false; });
+}
+function setFiltersOpen(open) {
+  $("#filterPanel").hidden = !open;
+  $("#filterToggle").setAttribute("aria-expanded", open ? "true" : "false");
+  pref.set("filters", open ? "open" : "closed");
+}
+// Chips under the search bar show what's filtering the list, so the panel can stay closed.
+function renderActiveFilters() {
+  const f = S.f, chips = [];
+  const chip = (label, clear, color) => chips.push(el("button", { class: "chip", type: "button", style: color ? `--rc:${color}` : null,
+    "aria-label": `Remove filter: ${label}`, onclick: () => { clear(); syncControls(); render(); } }, label, el("span", { "aria-hidden": "true" }, " ×")));
+  if (f.region) chip(regionName(f.region), () => (f.region = ""), regionColor(f.region));
+  if (f.state) chip(STATE_NAMES[f.state], () => (f.state = ""));
+  if (f.status !== "all") chip(f.status === "have" ? "Have" : "Still need", () => (f.status = "all"));
+  f.types.forEach((g) => chip(GROUPS.find((x) => x[0] === g)[1], () => f.types.delete(g)));
+  if (f.near) chip(f.near === ME ? `Within ${f.radius > 9999 ? "any distance" : f.radius + " mi"} of you` : `Near ${unitByKey(f.near)?.name || "park"}`, () => { f.near = null; });
+  if (chips.length > 1) chips.push(el("button", { class: "linkish", type: "button", onclick: () => {
+    Object.assign(f, { region: "", state: "", status: "all", near: null }); f.types.clear(); syncControls(); render(); } }, "Clear all"));
+  $("#activeFilters").replaceChildren(...chips);
+  const n = (f.state ? 1 : 0) + (f.status !== "all" ? 1 : 0) + f.types.size + (f.near ? 1 : 0);
+  $("#filterCount").textContent = n; $("#filterCount").hidden = !n;
+}
+function syncControls() {
+  $("#state").value = S.f.state;
+  [...$("#status").children].forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === S.f.status));
+  [...$("#types").children].forEach((x, i) => x.setAttribute("aria-pressed", S.f.types.has(GROUPS[i][0])));
+  if (!S.f.near) $("#near").value = "";
+  resetLocateBtn();
 }
 function resetLocateBtn() { if (S.f.near !== ME) $("#locateBtn").textContent = "Use my location"; }
 function setView(v) {
@@ -435,7 +480,9 @@ function onUser(user) {
   $("#app").hidden = !user;
   const acct = $("#account");
   if (!user) { acct.replaceChildren(); closeSheet(); drawBigStamp(0, NPS_UNITS.length); return; }
-  if (S.store.mode === "local") {
+  if (S.store.mode === "artifact") {
+    acct.replaceChildren(el("span", {}, "Preview: your stamps are saved privately to your Claude account."));
+  } else if (S.store.mode === "local") {
     acct.replaceChildren(el("span", {}, "Demo mode: saved in this browser only. Add your Firebase settings to sign in and sync."));
   } else {
     acct.replaceChildren(el("span", {}, "Signed in as " + (user.email || user.name)),
@@ -463,6 +510,9 @@ async function boot() {
   setupControls();
   setupAuth();
   drawBigStamp(0, NPS_UNITS.length);
+  // Filters start closed on phones so the list gets the screen; on wide screens they remember how you left them.
+  const fp = pref.get("filters");
+  setFiltersOpen(fp ? fp === "open" : window.matchMedia("(min-width: 900px)").matches);
   const v = pref.get("view");
   if (v === "map" || v === "list") { S.view = v; [...$("#view").children].forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === v)); }
   try { S.store = await createStore(); }

@@ -2,7 +2,7 @@
 
 A personal checklist for National Park Service passport stamps. Each person signs in and keeps their own list.
 
-- **Checklist** of 425 park sites with passport cancellations, grouped by state, with progress for each region.
+- **Checklist** of 425 park sites with passport cancellations, grouped by state and color-coded by passport region.
 - **One tap to check off a site.** Tap the empty circle in the list (or "Got the stamp" on the park page). Saving a visit checks it off too.
 - **Visit journal** with date, who you went with, notes and a rating.
 - **Map view** of every site (filled = have, hollow = still need).
@@ -39,6 +39,14 @@ cd public && python3 -m http.server 5000
 6. After the first deploy, add your hosting domain under **Authentication → Settings → Authorized domains** if it isn't already listed (`*.web.app` and `*.firebaseapp.com` are added automatically).
 
 "Use my location" needs HTTPS, which Firebase Hosting provides. On `localhost` it works too.
+
+## Region colors
+
+The nine region colors are set once at the top of `public/css/app.css` (`--r-NA`, `--r-MA`, … with lighter versions for dark mode). Everything else (region cards, stamp marks, list stripes, map dots and state shading) uses those. Change them there to match your passport book.
+
+## Claude preview page
+
+`node tools/build-preview.mjs` bundles `public/` into one file (`dist/stamp-trail-preview.html`) for the claude.ai preview. There, stamps save privately to the viewer's Claude account instead of Firebase. The real site doesn't need this step.
 
 ## Data layout
 
