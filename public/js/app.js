@@ -543,6 +543,7 @@ function setupControls() {
   $("#near").addEventListener("change", (e) => { const u = allUnits().find((x) => x.name === e.target.value); S.f.near = u ? u.key : null; resetLocateBtn(); render(); });
   $("#radius").addEventListener("change", (e) => { S.f.radius = +e.target.value; render(); });
   $("#filterToggle").addEventListener("click", () => setFiltersOpen($("#filterPanel").hidden));
+  $("#resetFilters").addEventListener("click", resetFilters);
   $("#locateBtn").addEventListener("click", locate);
   $("#scrim").addEventListener("click", closeSheet);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.open) closeSheet(); });
@@ -563,14 +564,18 @@ function renderActiveFilters() {
   if (f.status !== "all") chip(f.status === "have" ? "Have" : "Still need", () => (f.status = "all"));
   f.types.forEach((g) => chip(GROUPS.find((x) => x[0] === g)[1], () => f.types.delete(g)));
   if (f.near) chip(f.near === ME ? `Within ${f.radius > 9999 ? "any distance" : f.radius + " mi"} of you` : `Near ${unitByKey(f.near)?.name || "park"}`, () => { f.near = null; });
-  if (chips.length > 1) chips.push(el("button", { class: "linkish", type: "button", onclick: () => {
-    Object.assign(f, { region: "", state: "", status: "all", near: null }); f.types.clear(); syncControls(); render(); } }, "Clear all"));
+  if (chips.length > 1) chips.push(el("button", { class: "linkish", type: "button", onclick: resetFilters }, "Clear all"));
   $("#activeFilters").replaceChildren(...chips);
   const n = (f.state ? 1 : 0) + (f.status !== "all" ? 1 : 0) + f.types.size + (f.near ? 1 : 0);
   $("#filterCount").textContent = n; $("#filterCount").hidden = !n;
 }
+function resetFilters() {
+  Object.assign(S.f, { region: "", state: "", status: "all", near: null, radius: 250 }); S.f.types.clear();
+  syncControls(); render();
+}
 function syncControls() {
   $("#state").value = S.f.state;
+  $("#radius").value = String(S.f.radius);
   [...$("#status").children].forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === S.f.status));
   [...$("#types").children].forEach((x, i) => x.setAttribute("aria-pressed", S.f.types.has(GROUPS[i][0])));
   if (!S.f.near) $("#near").value = "";
