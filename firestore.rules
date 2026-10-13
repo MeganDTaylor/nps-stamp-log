@@ -1,11 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Each person can read and write only their own passport: users/{uid}/visits, /stamps, /places.
+    // Each person can read and write only their own passport: users/{uid}/visits, /stamps, /places,
+    // and /meta (their NPS API key and their refreshed park list).
     match /users/{uid}/{collection}/{docId} {
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && collection in ['visits', 'stamps', 'places']
+        && collection in ['visits', 'stamps', 'places', 'meta']
         && request.resource.data.keys().size() < 20
         && (!('notes' in request.resource.data) || request.resource.data.notes.size() < 10000);
     }

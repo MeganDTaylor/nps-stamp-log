@@ -1,6 +1,7 @@
 import { RAW_UNITS } from "./units.js";
 import { createStore } from "./store.js";
 import { US_STATES } from "./us-states.js";
+import { fetchParks, buildList } from "./nps.js";
 
 /* ---------- reference data ---------- */
 const TYPES = {
@@ -27,13 +28,16 @@ const regionName = (k) => (REGIONS.find((r) => r[0] === k) || [])[1] || "";
 const RATINGS = ["Quick stop", "Good", "Great", "Unforgettable"];
 const ME = "__me";
 
-const NPS_UNITS = RAW_UNITS.map(([code, name, type, st, lat, lon, reg]) =>
-  ({ key: code, code, name, type, st, lat: +lat, lon: +lon, region: reg || REGION_OF[st] }));
+const toUnits = (rows) => rows.map(([code, name, type, st, lat, lon, reg]) =>
+  ({ key: code, code, name, type: TYPES[type] ? type : "OTH", st, lat: +lat, lon: +lon, region: reg || REGION_OF[st] }));
+// The built-in list, replaced by your own copy once you refresh it from the NPS (see "Update park list").
+let NPS_UNITS = toUnits(RAW_UNITS);
 
 /* ---------- state ---------- */
 const S = {
   store: null, user: null, unsubs: [],
   visits: [], stamps: [], places: [],
+  list: null, npsKey: "", // list: {refreshedAt, count} when using a list refreshed from the NPS
   f: { q: "", state: "", status: "all", types: new Set(), region: "", near: null, radius: 250 },
   view: "list", here: null, open: null, editing: null, fresh: null,
 };
@@ -262,6 +266,7 @@ function armButton(btn, label, action) {
 function renderSheet() {
   if (S.open == null) return;
   if (S.open === "__add") return renderAddPlace();
+  if (S.open === "__list") return renderListSettings();
   const u = unitByKey(S.open);
   if (!u) { closeSheet(); return; }
   const vs = visitsFor(u.key);
@@ -374,6 +379,58 @@ function renderAddPlace() {
     f);
 }
 
+/* ---------- park list from the NPS ---------- */
+function renderListSettings() {
+  const status = el("div", { class: "hint", role: "status" });
+  const err = el("div", { class: "err", role: "alert" });
+  const key = el("input", { class: "field grow", type: "password", id: "npsKey", autocomplete: "off", spellcheck: "false",
+    value: S.npsKey, placeholder: "Paste your NPS API key" });
+  const show = el("button", { class: "linkish", type: "button", onclick: () => { key.type = key.type === "password" ? "text" : "password"; show.textContent = key.type === "password" ? "Show" : "Hide"; } }, "Show");
+  const go = el("button", { class: "btn primary", type: "submit" }, "Refresh park list");
+  const f = el("form", { class: "log", onsubmit: async (e) => {
+      e.preventDefault();
+      const k = key.value.trim();
+      err.textContent = ""; status.textContent = "";
+      if (!k) { err.textContent = "Paste your API key first."; return; }
+      go.disabled = true; go.textContent = "Refreshing…";
+      try {
+        if (k !== S.npsKey) await S.store.set("meta", "settings", { npsKey: k });
+        const parks = await fetchParks(k, (n, total) => { status.textContent = `Downloading parks… ${n} of ${total}`; });
+        const { rows, added, removed, skipped } = buildList(parks, new Set(NPS_UNITS.map((u) => u.code)));
+        if (rows.length < 100) throw new Error(`The NPS only returned ${rows.length} parks, so your current list was kept. Try again later.`);
+        await S.store.set("meta", "units", { json: JSON.stringify(rows), refreshedAt: new Date().toISOString(), count: rows.length });
+        const lost = removed.filter((c) => stampFor(c));
+        status.replaceChildren(...[
+          el("strong", {}, `Updated: ${rows.length} park sites.`),
+          added.length ? el("div", {}, `New: ${added.slice(0, 12).join(", ")}${added.length > 12 ? ` and ${added.length - 12} more` : ""}.`) : el("div", {}, "No new sites since your last list."),
+          removed.length ? el("div", {}, `No longer listed: ${removed.length} (${removed.slice(0, 8).join(", ")}${removed.length > 8 ? "…" : ""}).`) : null,
+          lost.length ? el("div", {}, `You have stamps for ${lost.join(", ")}. They're still saved and will show again if those sites come back.`) : null,
+          skipped.length ? el("div", {}, `Skipped ${skipped.length} without a location.`) : null,
+        ].filter(Boolean));
+      } catch (x) {
+        err.textContent = x.code === "permission-denied" ? "Couldn't save to your account. Sign out and back in, then try again." : x.message || "Something went wrong. Try again.";
+      } finally { go.disabled = false; go.textContent = "Refresh park list"; }
+    } },
+    el("label", { for: "npsKey" }, "NPS API key"),
+    el("div", { class: "row" }, key, show),
+    el("div", { class: "hint" }, "Saved privately to your account, so you only enter it once. ",
+      el("a", { href: "https://www.nps.gov/subjects/developer/get-started.htm", target: "_blank", rel: "noopener" }, "Get a free key ↗")),
+    el("div", { class: "row" }, go, S.npsKey ? el("button", { class: "linkish", type: "button", style: "color:var(--warn)",
+      onclick: (e) => armButton(e.target, "Tap again to forget the key", () => S.store.remove("meta", "settings").then(() => { key.value = ""; }).catch((x) => saveFailed(x, err))) }, "Forget key") : null),
+    status, err);
+  $("#sheet").replaceChildren(...[
+    el("button", { class: "btn close", type: "button", onclick: closeSheet }, "Close"),
+    el("h3", { id: "sheetTitle" }, "Update park list"),
+    el("p", { class: "lede", style: "margin:0" }, S.list
+      ? `You're using the list from the National Park Service, refreshed ${fmtDate(String(S.list.refreshedAt).slice(0, 10))} (${S.list.count} sites).`
+      : `You're using the built-in list (${RAW_UNITS.length} sites). Refresh it to get the latest sites straight from the National Park Service.`),
+    f,
+    S.list ? el("button", { class: "linkish", type: "button", style: "justify-self:start", onclick: (e) => armButton(e.target, "Tap again to switch back",
+      () => S.store.remove("meta", "units").catch((x) => saveFailed(x, err))) }, "Go back to the built-in list") : null,
+    el("p", { class: "hint" }, "A refresh doesn't touch your stamps or journal. They're tied to each park's code, which doesn't change."),
+  ].filter(Boolean));
+}
+
 /* ---------- location ---------- */
 function locate() {
   const btn = $("#locateBtn");
@@ -391,11 +448,10 @@ function locate() {
 /* ---------- controls ---------- */
 function setupControls() {
   const st = $("#state");
-  Object.keys(STATE_NAMES).filter((k) => NPS_UNITS.some((u) => u.st === k)).sort((a, b) => STATE_NAMES[a].localeCompare(STATE_NAMES[b])).forEach((k) => st.append(el("option", { value: k }, STATE_NAMES[k])));
+  fillUnitControls();
   $("#types").replaceChildren(...GROUPS.map(([g, label]) => el("button", { type: "button", "aria-pressed": "false", onclick: (e) => {
     S.f.types.has(g) ? S.f.types.delete(g) : S.f.types.add(g); e.target.setAttribute("aria-pressed", S.f.types.has(g)); render();
   } }, label)));
-  $("#nearList").replaceChildren(...NPS_UNITS.map((u) => el("option", { value: u.name })));
   let t;
   $("#q").addEventListener("input", (e) => { clearTimeout(t); t = setTimeout(() => { S.f.q = e.target.value.trim(); render(); }, 120); });
   st.addEventListener("change", (e) => { S.f.state = e.target.value; render(); });
@@ -407,6 +463,7 @@ function setupControls() {
   $("#locateBtn").addEventListener("click", locate);
   $("#scrim").addEventListener("click", closeSheet);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.open) closeSheet(); });
+  $("#updateListBtn").addEventListener("click", () => { S.open = "__list"; renderSheet(); $("#sheet").hidden = false; $("#scrim").hidden = false; });
   $("#addPlaceBtn").addEventListener("click", () => { S.open = "__add"; renderSheet(); $("#sheet").hidden = false; $("#scrim").hidden = false; });
 }
 function setFiltersOpen(open) {
@@ -475,6 +532,7 @@ function authMessage(e) {
 function onUser(user) {
   S.unsubs.forEach((u) => u()); S.unsubs = [];
   S.visits = []; S.stamps = []; S.places = [];
+  applyMeta([]);
   S.user = user;
   $("#auth").hidden = !!user;
   $("#app").hidden = !user;
@@ -492,8 +550,28 @@ function onUser(user) {
     S.unsubs.push(S.store.subscribe(name, (rows) => { S[name] = rows; scheduleRender(); },
       (e) => saveFailed(e)));
   }
+  S.unsubs.push(S.store.subscribe("meta", applyMeta, (e) => saveFailed(e)));
   render();
 }
+// meta/units holds your refreshed park list (as JSON text), meta/settings your NPS API key.
+function applyMeta(rows) {
+  const units = rows.find((r) => r.id === "units"), settings = rows.find((r) => r.id === "settings");
+  S.npsKey = settings?.npsKey || "";
+  let parsed = null;
+  try { parsed = units?.json ? JSON.parse(units.json) : null; } catch { parsed = null; }
+  const same = S.list ? !!parsed && S.list.refreshedAt === units.refreshedAt : !parsed;
+  S.list = parsed?.length ? { refreshedAt: units.refreshedAt || "", count: parsed.length } : null;
+  if (!same) { NPS_UNITS = toUnits(parsed?.length ? parsed : RAW_UNITS); fillUnitControls(); }
+  scheduleRender();
+}
+function fillUnitControls() {
+  const st = $("#state"), cur = st.value;
+  st.replaceChildren(el("option", { value: "" }, "All states"), ...Object.keys(STATE_NAMES).filter((k) => NPS_UNITS.some((u) => u.st === k))
+    .sort((a, b) => STATE_NAMES[a].localeCompare(STATE_NAMES[b])).map((k) => el("option", { value: k }, STATE_NAMES[k])));
+  st.value = cur;
+  $("#nearList").replaceChildren(...NPS_UNITS.map((u) => el("option", { value: u.name })));
+}
+
 let queued = false;
 function scheduleRender() {
   if (queued) return; queued = true;
@@ -501,7 +579,9 @@ function scheduleRender() {
     queued = false; render();
     // Don't redraw the sheet while someone is typing in it.
     const typing = $("#sheet").contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && document.activeElement.type !== "checkbox";
-    if (S.open && !S.editing && !typing) renderSheet();
+    // The add-place and park-list pages are forms with their own progress messages; leave them be.
+    const formPage = S.open === "__add" || S.open === "__list";
+    if (S.open && !S.editing && !typing && !formPage) renderSheet();
   });
 }
 

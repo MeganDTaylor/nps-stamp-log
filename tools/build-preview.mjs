@@ -19,7 +19,7 @@ const body = html.slice(html.indexOf("<body>") + 6, html.indexOf("</body>"))
 const css = read("public/css/app.css").replace(/html\{padding-top:[^}]*\}\n?/, "");
 
 // Join the modules into one script: drop local imports and the export keywords.
-const modules = ["units.js", "us-states.js", "firebase-config.js", "store.js", "app.js"].map((f) =>
+const modules = ["units.js", "us-states.js", "nps.js", "firebase-config.js", "store.js", "app.js"].map((f) =>
   `// ---- ${f} ----\n` + read("public/js/" + f)
     .replace(/^import \{[^}]*\} from "\.\/[^"]+";\n/gm, "")
     .replace(/^export (const|class|async function|function) /gm, "$1 "));

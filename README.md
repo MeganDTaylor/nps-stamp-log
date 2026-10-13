@@ -2,12 +2,13 @@
 
 A personal checklist for National Park Service passport stamps. Each person signs in and keeps their own list.
 
-- **Checklist** of 425 park sites with passport cancellations, grouped by state and color-coded by passport region.
+- **Checklist** of 474 park sites with passport cancellations, grouped by state and color-coded by passport region.
 - **One tap to check off a site.** Tap the empty circle in the list (or "Got the stamp" on the park page). Saving a visit checks it off too.
 - **Visit journal** with date, who you went with, notes and a rating.
 - **Map view** of every site (filled = have, hollow = still need).
 - **Near me** uses your phone's location to list the closest sites, or pick any park to see what's near it.
 - **Your own places**, such as national forests and state parks, which aren't part of the passport program.
+- **Update park list** from the National Park Service with your own API key, whenever you like.
 
 No build step: plain HTML, CSS and JavaScript modules, with Firebase Auth + Firestore for accounts and data, and Leaflet + OpenStreetMap for the map.
 
@@ -68,6 +69,19 @@ firebase emulators:start --only auth,firestore --project demo-stamptrail
 
 Then fill in any non-empty `apiKey` with `projectId: "demo-stamptrail"` and set `useEmulators = true` in `firebase-config.js`.
 
-## About the park list
+## The park list
 
-`public/js/units.js` was written by hand, because the official NPS data feed wasn't reachable when the app was built. Coordinates are approximate (good for distances and the map, not for navigation). A few of the newest sites may be missing. To refresh it from the official source, use the NPS API (`https://developer.nps.gov/api/v1/parks`, free key) and keep the same row shape.
+The built-in list (`public/js/units.js`, 474 sites) comes from the official [NPS Data API](https://www.nps.gov/subjects/developer/api-documentation.htm).
+
+**Refreshing it from the app:** tap **Update park list** at the bottom of the page, paste your NPS API key once, and tap **Refresh park list**. The app downloads the latest sites, saves your copy to your account (`users/{uid}/meta/units`), and tells you what was added or removed. Your key is saved privately to your account (`users/{uid}/meta/settings`). Stamps and journal entries are tied to park codes, so a refresh never loses them.
+
+**Refreshing the built-in list** (what new accounts start with):
+
+```sh
+echo "NPS_API_KEY=your-key" > .env     # .env is git-ignored
+node tools/fetch-nps-units.mjs
+```
+
+Each site is filed under the state that contains its coordinates (the API lists a multi-state park's states alphabetically). Types (National Park, Monument, Historic Site…) come from the API's designation. Both the app and the script use the same conversion code in `public/js/nps.js`.
+
+Behind a corporate or cloud proxy, run the script with `NODE_USE_ENV_PROXY=1`.
