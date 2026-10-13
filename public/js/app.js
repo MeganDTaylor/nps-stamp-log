@@ -27,10 +27,12 @@ const regionColor = (k) => (k ? `var(--r-${k})` : "var(--ink)");
 const regionName = (k) => (REGIONS.find((r) => r[0] === k) || [])[1] || "";
 const ME = "__me";
 
-// Each site's region comes from its state (National Capital is DC only). It's worked out here rather than
-// trusted from a saved list, so a change to REGIONS applies to an already-refreshed list too.
+// Sites the passport book files outside their state's region (its National Capital page lists Fort Washington).
+const REGION_FIX = { FOWA: "NC" };
+// Each site's region comes from its state, or REGION_FIX. It's worked out here rather than trusted from a
+// saved list, so a change here applies to an already-refreshed list too.
 const toUnits = (rows) => rows.map(([code, name, type, st, lat, lon]) =>
-  ({ key: code, code, name, type: TYPES[type] ? type : "OTH", st, lat: +lat, lon: +lon, region: REGION_OF[st] }));
+  ({ key: code, code, name, type: TYPES[type] ? type : "OTH", st, lat: +lat, lon: +lon, region: REGION_FIX[code] || REGION_OF[st] }));
 // The built-in list, replaced by your own copy once you refresh it from the NPS (see "Update park list").
 let NPS_UNITS = toUnits(RAW_UNITS);
 
