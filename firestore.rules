@@ -1,14 +1,26 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // The owner's User UID (Firebase console → Authentication → Users). Must match ownerUid in public/js/firebase-config.js.
+    function isOwner() { return request.auth != null && request.auth.uid == "OWNER_UID"; }
+
     // Each person can read and write only their own passport: users/{uid}/visits, /stamps, /places,
-    // and /meta (their NPS API key and their refreshed park list).
+    // and /meta (their NPS API key).
     match /users/{uid}/{collection}/{docId} {
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow create, update: if request.auth != null && request.auth.uid == uid
         && collection in ['visits', 'stamps', 'places', 'meta']
         && request.resource.data.keys().size() < 20
         && (!('notes' in request.resource.data) || request.resource.data.notes.size() < 10000);
+    }
+
+    // The park list everyone uses. Anyone signed in can read it; only the owner can refresh it.
+    match /shared/{docId} {
+      allow read: if request.auth != null;
+      allow delete: if isOwner();
+      allow create, update: if isOwner() && docId == 'units'
+        && request.resource.data.keys().size() < 10
+        && request.resource.data.json is string && request.resource.data.json.size() < 900000;
     }
   }
 }

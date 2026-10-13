@@ -8,7 +8,7 @@
 //
 // Run it again whenever you want to pick up new park sites. It prints what was added and removed.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { fetchParks, fetchAll, buildList, buildParkInfo } from "../public/js/nps.js";
 
@@ -52,4 +52,4 @@ async function main() {
   if (skipped.length) console.log(`\nSkipped, missing a state or location (${skipped.length}):\n  ` + skipped.join("\n  "));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.error(e.message); process.exit(1); });
+if (import.meta.url === pathToFileURL(process.argv[1]).href) main().catch((e) => { console.error(e.message); process.exit(1); });

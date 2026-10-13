@@ -481,7 +481,7 @@ function renderListSettings() {
         const parks = await fetchParks(k, (n, total) => { status.textContent = `Downloading parks… ${n} of ${total}`; });
         const { rows, added, removed, skipped } = buildList(parks, new Set(NPS_UNITS.map((u) => u.code)));
         if (rows.length < 100) throw new Error(`The NPS only returned ${rows.length} parks, so your current list was kept. Try again later.`);
-        await S.store.set("meta", "units", { json: JSON.stringify(rows), refreshedAt: new Date().toISOString(), count: rows.length });
+        await S.store.setShared("units", { json: JSON.stringify(rows), refreshedAt: new Date().toISOString(), count: rows.length });
         const lost = removed.filter((c) => stampFor(c));
         status.replaceChildren(...[
           el("strong", {}, `Updated: ${rows.length} park sites.`),
@@ -491,7 +491,7 @@ function renderListSettings() {
           skipped.length ? el("div", {}, `Skipped ${skipped.length} without a location.`) : null,
         ].filter(Boolean));
       } catch (x) {
-        err.textContent = x.code === "permission-denied" ? "Couldn't save to your account. Sign out and back in, then try again." : x.message || "Something went wrong. Try again.";
+        err.textContent = x.code === "permission-denied" ? "The database didn't accept the new list. Check that OWNER_UID in firestore.rules is your User UID and the rules are deployed." : x.message || "Something went wrong. Try again.";
       } finally { go.disabled = false; go.textContent = "Refresh park list"; }
     } },
     el("label", { for: "npsKey" }, "NPS API key"),
@@ -505,12 +505,12 @@ function renderListSettings() {
     el("button", { class: "btn close", type: "button", onclick: closeSheet }, "Close"),
     el("h3", { id: "sheetTitle" }, "Update park list"),
     el("p", { class: "lede", style: "margin:0" }, S.list
-      ? `You're using the list from the National Park Service, refreshed ${fmtDate(String(S.list.refreshedAt).slice(0, 10))} (${S.list.count} sites).`
-      : `You're using the built-in list (${RAW_UNITS.length} sites). Refresh it to get the latest sites straight from the National Park Service.`),
+      ? `Everyone is using the list from the National Park Service you refreshed ${fmtDate(String(S.list.refreshedAt).slice(0, 10))} (${S.list.count} sites).`
+      : `Everyone is using the built-in list (${RAW_UNITS.length} sites). Refresh it to get the latest sites straight from the National Park Service. Only you see this page, and nobody else needs a key.`),
     f,
     S.list ? el("button", { class: "linkish", type: "button", style: "justify-self:start", onclick: (e) => armButton(e.target, "Tap again to switch back",
-      () => S.store.remove("meta", "units").catch((x) => saveFailed(x, err))) }, "Go back to the built-in list") : null,
-    el("p", { class: "hint" }, "A refresh doesn't touch your stamps or journal. They're tied to each park's code, which doesn't change."),
+      () => S.store.removeShared("units").catch((x) => saveFailed(x, err))) }, "Go back to the built-in list") : null,
+    el("p", { class: "hint" }, "A refresh updates the list for everyone. It doesn't touch anyone's stamps or journal. They're tied to each park's code, which doesn't change."),
   ].filter(Boolean));
 }
 
@@ -614,8 +614,9 @@ function authMessage(e) {
 function onUser(user) {
   S.unsubs.forEach((u) => u()); S.unsubs = [];
   S.visits = []; S.stamps = []; S.places = [];
-  applyMeta([]);
+  applyMeta([]); applyShared(null);
   S.user = user;
+  $("#updateListRow").hidden = !(user && S.store.isOwner);
   $("#auth").hidden = !!user;
   $("#app").hidden = !user;
   const acct = $("#account");
@@ -633,12 +634,17 @@ function onUser(user) {
       (e) => saveFailed(e)));
   }
   S.unsubs.push(S.store.subscribe("meta", applyMeta, (e) => saveFailed(e)));
+  S.unsubs.push(S.store.subscribeShared("units", applyShared, (e) => console.warn("Couldn't load the shared park list", e)));
   render();
 }
-// meta/units holds your refreshed park list (as JSON text), meta/settings your NPS API key.
+// meta/settings holds your NPS API key.
 function applyMeta(rows) {
-  const units = rows.find((r) => r.id === "units"), settings = rows.find((r) => r.id === "settings");
+  const settings = rows.find((r) => r.id === "settings");
   S.npsKey = settings?.npsKey || "";
+  scheduleRender();
+}
+// shared/units holds the park list (as JSON text) the owner last refreshed from the NPS. Everyone uses it.
+function applyShared(units) {
   let parsed = null;
   try { parsed = units?.json ? JSON.parse(units.json) : null; } catch { parsed = null; }
   const same = S.list ? !!parsed && S.list.refreshedAt === units.refreshedAt : !parsed;

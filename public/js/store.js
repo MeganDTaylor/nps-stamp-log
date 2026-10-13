@@ -2,8 +2,9 @@
 //   FirebaseStore — Firebase Auth + Firestore, data under users/{uid}/...
 //   ArtifactStore — the claude.ai preview page, data in the viewer's private artifact storage.
 //   LocalStore    — demo mode, saves to localStorage, no sign-in.
-// Collections used by the app: "visits", "stamps", "places".
-import { firebaseConfig, useEmulators } from "./firebase-config.js";
+// Collections used by the app: "visits", "stamps", "places", "meta".
+// Shared docs (the same for everyone; only the owner can change them): "units", the park list.
+import { firebaseConfig, useEmulators, ownerUid } from "./firebase-config.js";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.12.2";
 
@@ -71,7 +72,24 @@ class FirebaseStore {
     return this.sdk.fs.setDoc(this.sdk.fs.doc(this.col(name), id), { ...data, updatedAt: this.sdk.fs.serverTimestamp() });
   }
   remove(name, id) { return this.sdk.fs.deleteDoc(this.sdk.fs.doc(this.col(name), id)); }
+
+  get isOwner() { return !!ownerUid && this.uid === ownerUid; }
+  subscribeShared(id, cb, onError) {
+    return this.sdk.fs.onSnapshot(this.sdk.fs.doc(this.db, "shared", id), (d) => cb(d.exists() ? d.data() : null), onError);
+  }
+  setShared(id, data) {
+    return this.sdk.fs.setDoc(this.sdk.fs.doc(this.db, "shared", id), { ...data, updatedAt: this.sdk.fs.serverTimestamp() });
+  }
+  removeShared(id) { return this.sdk.fs.deleteDoc(this.sdk.fs.doc(this.db, "shared", id)); }
 }
+
+// The preview and demo mode have only one person, so "shared" is just their own collection and they own it.
+const ownShared = {
+  isOwner: true,
+  subscribeShared(id, cb, onError) { return this.subscribe("shared", (rows) => cb(rows.find((r) => r.id === id) || null), onError); },
+  setShared(id, data) { return this.set("shared", id, data); },
+  removeShared(id) { return this.remove("shared", id); },
+};
 
 class ArtifactStore {
   constructor(db, uid) {
@@ -128,3 +146,5 @@ class LocalStore {
   }
   async remove(name, id) { this.write(name, this.read(name).filter((r) => r.id !== id)); }
 }
+Object.assign(ArtifactStore.prototype, ownShared);
+Object.assign(LocalStore.prototype, ownShared);

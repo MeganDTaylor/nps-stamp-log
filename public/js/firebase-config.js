@@ -10,5 +10,9 @@ export const firebaseConfig = {
   appId: "1:160813169305:web:52040ea2025fe1d0915608",
 };
 
+// Your account's User UID (Firebase console → Authentication → Users). Only this account sees
+// "Update park list", and its refresh becomes everyone's list. It must match OWNER_UID in firestore.rules.
+export const ownerUid = "";
+
 // Set to true to point at the local Firebase emulators (firebase emulators:start).
 export const useEmulators = false;
