@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stamp Trail</title>
+<meta name="description" content="A personal checklist of National Park Service passport stamps, with a map, nearby sites and a visit journal.">
+<meta name="theme-color" content="#2e6a4c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%233d3f97' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%233d3f97' stroke-width='2' stroke-dasharray='2 2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">National Park Service passport stamps</div>
+      <h1>Stamp Trail</h1>
+      <p class="lede">Every park site with a passport cancellation in one checklist. Tap a site to check off its stamps and write down how the visit went.</p>
+      <div class="account" id="account"></div>
+      <div class="notice" id="notice" hidden></div>
+    </div>
+    <svg class="big-stamp" id="bigStamp" viewBox="0 0 150 150" aria-hidden="true"></svg>
+  </header>
+
+  <section id="auth" class="auth" hidden>
+    <h2>Sign in to your passport</h2>
+    <p class="lede">Your checklist is saved to your account, so it's the same on your phone and your computer.</p>
+    <form id="authForm" class="log">
+      <label>Email <input class="field" type="email" id="authEmail" autocomplete="email" required></label>
+      <label>Password <input class="field" type="password" id="authPw" autocomplete="current-password" minlength="6" required></label>
+      <div class="err" id="authErr" role="status"></div>
+      <div class="row">
+        <button class="btn primary" type="submit" id="signInBtn">Sign in</button>
+        <button class="btn" type="button" id="signUpBtn">Create account</button>
+        <button class="linkish" type="button" id="resetBtn">Forgot password?</button>
+      </div>
+      <div class="or">or</div>
+      <button class="btn" type="button" id="googleBtn">Continue with Google</button>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <section class="summary" id="summary" aria-label="Progress by region"></section>
+
+    <section class="filters" aria-label="Filters">
+      <div class="row">
+        <input id="q" class="field" type="search" placeholder="Search parks, states, codes…" aria-label="Search">
+        <select id="state" class="field" aria-label="State"><option value="">All states</option></select>
+        <div class="seg" id="view" role="group" aria-label="View">
+          <button data-v="list" aria-pressed="true">List</button>
+          <button data-v="map" aria-pressed="false">Map</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="seg" id="status" role="group" aria-label="Status">
+          <button data-v="all" aria-pressed="true">All</button>
+          <button data-v="need" aria-pressed="false">Still need</button>
+          <button data-v="have" aria-pressed="false">Have</button>
+        </div>
+        <div class="seg" id="types" role="group" aria-label="Site type"></div>
+      </div>
+      <div class="row">
+        <label for="near" class="eyebrow">Near</label>
+        <button class="btn" id="locateBtn" type="button">Use my location</button>
+        <input id="near" class="field grow" list="nearList" placeholder="…or pick a park">
+        <datalist id="nearList"></datalist>
+        <select id="radius" class="field" aria-label="Distance">
+          <option value="50">within 50 mi</option><option value="100">within 100 mi</option>
+          <option value="250" selected>within 250 mi</option><option value="500">within 500 mi</option><option value="99999">any distance</option>
+        </select>
+        <button class="btn" id="clearNear" type="button" hidden>Clear</button>
+        <span class="count" id="count"></span>
+      </div>
+    </section>
+
+    <div id="mapWrap" hidden><div id="map" role="region" aria-label="Map of park sites"></div>
+      <div class="legend"><span><i class="dot have"></i>Have</span><span><i class="dot need"></i>Still need</span><span><i class="dot custom"></i>Your places</span><span><i class="dot me"></i>You</span></div>
+    </div>
+    <main id="list"></main>
+
+    <p class="lede" style="margin-top:28px">National forests, state parks and other spots aren't part of the passport program, but you can still track them.
+      <button class="linkish" id="addPlaceBtn" type="button">Add your own place</button></p>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="sheet" id="sheet" hidden aria-modal="true" role="dialog" aria-labelledby="sheetTitle" tabindex="-1"></aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
