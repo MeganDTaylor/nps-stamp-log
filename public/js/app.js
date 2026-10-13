@@ -548,7 +548,6 @@ function setupControls() {
 function setFiltersOpen(open) {
   $("#filterPanel").hidden = !open;
   $("#filterToggle").setAttribute("aria-expanded", open ? "true" : "false");
-  pref.set("filters", open ? "open" : "closed");
 }
 // Chips under the search bar show what's filtering the list, so the panel can stay closed.
 function renderActiveFilters() {
@@ -669,9 +668,8 @@ async function boot() {
   setupControls();
   setupAuth();
   drawBigStamp(0, NPS_UNITS.length);
-  // Filters start closed on phones so the list gets the screen; on wide screens they remember how you left them.
-  const fp = pref.get("filters");
-  setFiltersOpen(fp ? fp === "open" : window.matchMedia("(min-width: 900px)").matches);
+  // Filters start closed so the list gets the screen; the chips under the search bar show what's active.
+  setFiltersOpen(false);
   const v = pref.get("view");
   if (v === "map" || v === "list") { S.view = v; [...$("#view").children].forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === v)); }
   try { S.store = await createStore(); }

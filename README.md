@@ -1,4 +1,4 @@
-# Stamp Trail
+# NPS Stamp Log
 
 A personal checklist for National Park Service passport stamps. Each person signs in and keeps their own list.
 
@@ -32,7 +32,7 @@ You do steps 1–5 once, in the browser. Step 6 is on your computer.
    - **Email/Password:** Enable (leave "Email link" off) → Save.
    - **Google:** Enable → pick your email as the support email → Save.
 3. **Create the database.** **Build → Firestore Database → Create database.** Pick a location near you (for example `us-central1` or `nam5`). This can't be changed later. Start in **production mode**; the deploy in step 6 installs this app's rules.
-4. **Register the web app.** **Project settings** (gear icon) → **Your apps** → the **</>** (Web) button → nickname "Stamp Trail". Leave "Also set up Firebase Hosting" unchecked; step 6 does that. Copy the `firebaseConfig` values it shows into `public/js/firebase-config.js` (already done for `nps-stamp-log`; `.firebaserc` points the CLI at it). They aren't secret; the security rules are what protect the data.
+4. **Register the web app.** **Project settings** (gear icon) → **Your apps** → the **</>** (Web) button → nickname "NPS Stamp Log". Leave "Also set up Firebase Hosting" unchecked; step 6 does that. Copy the `firebaseConfig` values it shows into `public/js/firebase-config.js` (already done for `nps-stamp-log`; `.firebaserc` points the CLI at it). They aren't secret; the security rules are what protect the data.
 5. **Billing:** the free Spark plan covers this app. No card needed.
 6. **Deploy** from the project folder on your computer (needs [Node.js](https://nodejs.org) 18 or newer):
 
