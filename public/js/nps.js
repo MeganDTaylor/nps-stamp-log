@@ -3,7 +3,7 @@
 import { US_STATES } from "./us-states.js";
 
 // Sites the passport book files under National Capital even though they sit in MD, VA or WV.
-const NATIONAL_CAPITAL = new Set(["LYBA", "GWMP", "ARHO", "CHOH", "CLBA", "GLEC", "WOTR", "PRWI", "MANA", "HAFE",
+export const NATIONAL_CAPITAL = new Set(["LYBA", "GWMP", "ARHO", "CHOH", "CLBA", "GLEC", "WOTR", "MANA", "HAFE",
   "ANTI", "MONO", "CATO", "FOWA", "GREE", "PISC", "OXHI", "APPA", "NACC", "NAMA", "ROCR", "WHHO"]);
 
 // The API lists a multi-state park's states alphabetically, so file each site under the state

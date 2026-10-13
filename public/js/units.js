@@ -436,7 +436,7 @@ export const RAW_UNITS = [
 ["MANA","Manassas National Battlefield Park","BAT","VA","38.817","-77.535","NC"],
 ["PETE","Petersburg National Battlefield","BAT","VA","37.191","-77.476"],
 ["POHE","Potomac Heritage National Scenic Trail","TRL","VA","39.151","-77.523"],
-["PRWI","Prince William Forest Park","OTH","VA","38.586","-77.389","NC"],
+["PRWI","Prince William Forest Park","OTH","VA","38.586","-77.389"],
 ["RICH","Richmond National Battlefield Park","BAT","VA","37.488","-77.291"],
 ["SHEN","Shenandoah National Park","NP","VA","38.492","-78.469"],
 ["WOTR","Wolf Trap National Park for the Performing Arts","OTH","VA","38.939","-77.265","NC"],

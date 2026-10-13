@@ -1,7 +1,7 @@
 import { RAW_UNITS } from "./units.js";
 import { createStore } from "./store.js";
 import { US_STATES } from "./us-states.js";
-import { fetchParks, buildList, fetchParkLive } from "./nps.js";
+import { fetchParks, buildList, fetchParkLive, NATIONAL_CAPITAL } from "./nps.js";
 
 /* ---------- reference data ---------- */
 const TYPES = {
@@ -28,8 +28,10 @@ const regionName = (k) => (REGIONS.find((r) => r[0] === k) || [])[1] || "";
 const RATINGS = ["Quick stop", "Good", "Great", "Unforgettable"];
 const ME = "__me";
 
-const toUnits = (rows) => rows.map(([code, name, type, st, lat, lon, reg]) =>
-  ({ key: code, code, name, type: TYPES[type] ? type : "OTH", st, lat: +lat, lon: +lon, region: reg || REGION_OF[st] }));
+// Regions are worked out here rather than trusted from the saved list, so a fix to NATIONAL_CAPITAL applies
+// to an already-refreshed list too.
+const toUnits = (rows) => rows.map(([code, name, type, st, lat, lon]) =>
+  ({ key: code, code, name, type: TYPES[type] ? type : "OTH", st, lat: +lat, lon: +lon, region: NATIONAL_CAPITAL.has(code) ? "NC" : REGION_OF[st] }));
 // The built-in list, replaced by your own copy once you refresh it from the NPS (see "Update park list").
 let NPS_UNITS = toUnits(RAW_UNITS);
 
