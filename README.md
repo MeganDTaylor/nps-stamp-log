@@ -61,7 +61,7 @@ The code lives at [megandtaylor/nps-stamp-log](https://github.com/megandtaylor/n
 
 ## Region colors
 
-The nine region colors are set once at the top of `public/css/app.css` (`--r-NA`, `--r-MA`, … with lighter versions for dark mode). Everything else (region cards, stamp marks, list stripes, map dots and state shading) uses those. Change them there to match your passport book.
+The nine region colors are set once at the top of `public/css/app.css` (`--r-NA`, `--r-MA`, … with lighter versions for dark mode). Everything else (region cards, stamp marks, list stripes, map dots and state shading) uses those. They match the map in the passport book.
 
 ## Claude preview page
 

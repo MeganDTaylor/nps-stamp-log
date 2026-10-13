@@ -16,8 +16,8 @@ const GROUPS = [["parks", "National Parks"], ["monuments", "Monuments"], ["memor
   ["battle", "Battlefields"], ["rec", "Seashores, lakes & preserves"], ["rivers", "Rivers, trails & parkways"], ["other", "Other parks"], ["custom", "Your places"]];
 const REGIONS = [
   ["NA", "North Atlantic", "ME NH VT MA RI CT NY NJ"], ["MA", "Mid-Atlantic", "PA DE MD VA WV"], ["NC", "National Capital", "DC"],
-  ["SE", "Southeast", "KY TN NC SC GA FL AL MS LA PR VI"], ["MW", "Midwest", "OH IN IL MI WI MN IA MO AR NE KS"],
-  ["SW", "Southwest", "TX OK NM AZ"], ["RM", "Rocky Mountain", "CO MT ND SD UT WY"], ["W", "Western", "CA NV HI GU AS MP"], ["PNW", "Pacific NW & Alaska", "AK ID OR WA"],
+  ["SE", "Southeast", "KY TN NC SC GA FL AL MS PR VI"], ["MW", "Midwest", "OH IN IL MI WI MN IA MO NE KS"],
+  ["SW", "Southwest", "TX OK NM AZ AR LA"], ["RM", "Rocky Mountain", "CO MT ND SD UT WY"], ["W", "Western", "CA NV HI GU AS MP"], ["PNW", "Pacific NW & Alaska", "AK ID OR WA"],
 ];
 const REGION_OF = {};
 REGIONS.forEach(([k, , s]) => s.split(" ").forEach((st) => (REGION_OF[st] = k)));

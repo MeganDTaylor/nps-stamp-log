@@ -6,22 +6,23 @@
   --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
   --r:10px;
-  /* Passport regions. Change these nine to match the colors in your passport book; everything else follows. */
-  --r-NA:#c0392b; --r-MA:#b7791f; --r-NC:#1d4ed8; --r-SE:#15803d; --r-MW:#7c3aed;
-  --r-SW:#ea580c; --r-RM:#0f766e; --r-W:#be185d; --r-PNW:#7c4a1e;
+  /* Passport regions, matched to the passport book's map. These are the book's hues deepened just enough
+     to read as text on the light page; the dark-mode values below are the book's colors themselves. */
+  --r-NA:#926442; --r-MA:#5c6cab; --r-NC:#c23a43; --r-SE:#a25779; --r-MW:#af5526;
+  --r-SW:#7c6a70; --r-RM:#96640b; --r-W:#366f4c; --r-PNW:#3674a1;
   --rc:var(--ink);
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#121613; --surface:#1a201c; --sunk:#232a25; --fg:#e5ebe4; --muted:#9aa69c; --line:#323b34;
   --ink:#aeb0f7; --ink-soft:#2a2b4d; --forest:#7cc79e; --forest-soft:#1f3328; --warn:#f0936c; --custom:#e6a85a;
-  --r-NA:#f2786b; --r-MA:#e3b04b; --r-NC:#7aa2ff; --r-SE:#5cc98a; --r-MW:#b69cff;
-  --r-SW:#ff9a5c; --r-RM:#4fc7bb; --r-W:#f27bb4; --r-PNW:#c9925f; color-scheme:dark}}
+  --r-NA:#cd936b; --r-MA:#b5c9e7; --r-NC:#d57178; --r-SE:#b97d98; --r-MW:#d87c4d;
+  --r-SW:#c8bfc2; --r-RM:#f2b850; --r-W:#4d9f6d; --r-PNW:#5898c7; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#121613; --surface:#1a201c; --sunk:#232a25; --fg:#e5ebe4; --muted:#9aa69c; --line:#323b34;
   --ink:#aeb0f7; --ink-soft:#2a2b4d; --forest:#7cc79e; --forest-soft:#1f3328; --warn:#f0936c; --custom:#e6a85a;
-  --r-NA:#f2786b; --r-MA:#e3b04b; --r-NC:#7aa2ff; --r-SE:#5cc98a; --r-MW:#b69cff;
-  --r-SW:#ff9a5c; --r-RM:#4fc7bb; --r-W:#f27bb4; --r-PNW:#c9925f; color-scheme:dark}
+  --r-NA:#cd936b; --r-MA:#b5c9e7; --r-NC:#d57178; --r-SE:#b97d98; --r-MW:#d87c4d;
+  --r-SW:#c8bfc2; --r-RM:#f2b850; --r-W:#4d9f6d; --r-PNW:#5898c7; color-scheme:dark}
 *{box-sizing:border-box}
 html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
