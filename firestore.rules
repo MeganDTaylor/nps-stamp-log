@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // The owner's User UID (Firebase console → Authentication → Users). Must match ownerUid in public/js/firebase-config.js.
-    function isOwner() { return request.auth != null && request.auth.uid == "OWNER_UID"; }
+    function isOwner() { return request.auth != null && request.auth.uid == "ckeR0bMZrUd86prT4f8XFI7FQsk2"; }
 
     // Each person can read and write only their own passport: users/{uid}/visits, /stamps, /places,
     // and /meta (their NPS API key).
