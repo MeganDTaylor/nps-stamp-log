@@ -100,6 +100,9 @@ function saveFailed(e, box) {
 /* ---------- stamp graphics ---------- */
 const NS = "http://www.w3.org/2000/svg";
 function svgEl(tag, attrs) { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; }
+// Dated like a real cancellation stamp: "Dec 31 2024".
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const stampDate = (d) => { if (!d) return ""; const [y, m, dd] = d.split("-"); return `${MONTHS[+m - 1]} ${+dd} ${y}`; };
 function markSVG(u, stamped) {
   const svg = svgEl("svg", { viewBox: "0 0 50 50", class: "mark" + (S.fresh === u.key ? " fresh" : ""), role: "img", "aria-label": stamped ? "Stamped" : "Not yet" });
   const rot = ((u.key.charCodeAt(0) * 7 + u.key.charCodeAt(u.key.length - 1) * 3) % 21) - 10;
@@ -107,8 +110,9 @@ function markSVG(u, stamped) {
   const ink = regionColor(u.region);
   const ring = (r, dash) => svgEl("circle", { cx: 25, cy: 25, r, fill: "none", stroke: stamped ? ink : "var(--line)", "stroke-width": dash ? 1.5 : 2, ...(dash ? { "stroke-dasharray": "3 3" } : {}) });
   if (stamped) {
-    const t = svgEl("text", { x: 25, y: 24, "text-anchor": "middle", "font-size": 9, fill: ink }); t.textContent = u.code || "★";
-    const d = svgEl("text", { x: 25, y: 34, "text-anchor": "middle", "font-size": 6.5, fill: ink }); d.textContent = firstDate(u.key).slice(2).replace(/-/g, ".");
+    const t = svgEl("text", { x: 25, y: 23, "text-anchor": "middle", "font-size": 9, fill: ink }); t.textContent = u.code || "★";
+    // Squeezed to fit the inner ring, the way the date band on a real stamp is narrow.
+    const d = svgEl("text", { x: 25, y: 33, "text-anchor": "middle", "font-size": 6, textLength: 29, lengthAdjust: "spacingAndGlyphs", fill: ink }); d.textContent = stampDate(firstDate(u.key));
     g.append(ring(22), ring(17, true), t, d);
   } else g.append(ring(21, true));
   svg.append(g);
