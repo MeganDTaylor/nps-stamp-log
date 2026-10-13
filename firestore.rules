@@ -4,12 +4,12 @@ service cloud.firestore {
     // The owner's User UID (Firebase console → Authentication → Users). Must match ownerUid in public/js/firebase-config.js.
     function isOwner() { return request.auth != null && request.auth.uid == "ckeR0bMZrUd86prT4f8XFI7FQsk2"; }
 
-    // Each person can read and write only their own passport: users/{uid}/visits, /stamps, /places,
+    // Each person can read and write only their own passport: users/{uid}/visits, /stamps,
     // and /meta (their NPS API key).
     match /users/{uid}/{collection}/{docId} {
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && collection in ['visits', 'stamps', 'places', 'meta']
+        && collection in ['visits', 'stamps', 'meta']
         && request.resource.data.keys().size() < 20
         && (!('notes' in request.resource.data) || request.resource.data.notes.size() < 10000);
     }

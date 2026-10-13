@@ -2,7 +2,7 @@
 //   FirebaseStore — Firebase Auth + Firestore, data under users/{uid}/...
 //   ArtifactStore — the claude.ai preview page, data in the viewer's private artifact storage.
 //   LocalStore    — demo mode, saves to localStorage, no sign-in.
-// Collections used by the app: "visits", "stamps", "places", "meta".
+// Collections used by the app: "visits", "stamps", "meta".
 // Shared docs (the same for everyone; only the owner can change them): "units", the park list.
 import { firebaseConfig, useEmulators, ownerUid } from "./firebase-config.js";
 

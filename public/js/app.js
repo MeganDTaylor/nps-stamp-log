@@ -10,10 +10,10 @@ const TYPES = {
   MEM: { label: "Memorial", group: "memorials" }, BAT: { label: "Battlefield", group: "battle" },
   REC: { label: "Recreation / Seashore / Lakeshore", group: "rec" }, PRES: { label: "Preserve / Reserve", group: "rec" },
   RIV: { label: "River", group: "rivers" }, TRL: { label: "Trail", group: "rivers" }, PKWY: { label: "Parkway", group: "rivers" },
-  OTH: { label: "Park", group: "other" }, CUST: { label: "Your place", group: "custom" },
+  OTH: { label: "Park", group: "other" },
 };
 const GROUPS = [["parks", "National Parks"], ["monuments", "Monuments"], ["memorials", "Memorials"], ["history", "Historic sites"],
-  ["battle", "Battlefields"], ["rec", "Seashores, lakes & preserves"], ["rivers", "Rivers, trails & parkways"], ["other", "Other parks"], ["custom", "Your places"]];
+  ["battle", "Battlefields"], ["rec", "Seashores, lakes & preserves"], ["rivers", "Rivers, trails & parkways"], ["other", "Other parks"]];
 const REGIONS = [
   ["NA", "North Atlantic", "ME NH VT MA RI CT NY NJ"], ["MA", "Mid-Atlantic", "PA DE MD VA WV"], ["NC", "National Capital", "DC"],
   ["SE", "Southeast", "KY TN NC SC GA FL AL MS PR VI"], ["MW", "Midwest", "OH IN IL MI WI MN IA MO NE KS"],
@@ -36,7 +36,7 @@ let NPS_UNITS = toUnits(RAW_UNITS);
 /* ---------- state ---------- */
 const S = {
   store: null, user: null, unsubs: [],
-  visits: [], stamps: [], places: [],
+  visits: [], stamps: [],
   list: null, npsKey: "", // list: {refreshedAt, count} when using a list refreshed from the NPS
   info: null, infoState: "idle", // park details and stamp locations, from data/park-info.json
   live: {}, // per park code: {state, info, alerts, at} fetched from the NPS with your key
@@ -67,12 +67,7 @@ function miles(a, b) {
 }
 const hasCoords = (u) => u && typeof u.lat === "number" && !isNaN(u.lat) && typeof u.lon === "number";
 
-function allUnits() {
-  return NPS_UNITS.concat(S.places.map((p) => ({
-    key: "x-" + p.id, code: "", name: p.name, type: "CUST", st: p.st || "", lat: p.lat ?? NaN, lon: p.lon ?? NaN,
-    region: REGION_OF[p.st] || "", custom: true, kind: p.kind,
-  })));
-}
+function allUnits() { return NPS_UNITS; }
 const unitByKey = (k) => allUnits().find((u) => u.key === k);
 const visitsFor = (key) => S.visits.filter((v) => v.unit === key).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 // One stamp per site, stored at stamps/{unit key} with the date it was collected.
@@ -176,7 +171,7 @@ function unitRow(u, near) {
     mark,
     el("div", { style: "min-width:0" }, el("div", { class: "nm" }, u.name),
       el("div", { class: "meta" },
-        el("span", { class: "tag" + (u.type === "NP" ? " np" : "") }, u.custom ? (u.kind || "Your place") : TYPES[u.type].label),
+        el("span", { class: "tag" + (u.type === "NP" ? " np" : "") }, TYPES[u.type].label),
         u.region ? el("span", { class: "rdot", style: `--rc:${regionColor(u.region)}` }, regionName(u.region)) : null,
         u.code ? el("span", {}, u.code) : null)),
     near ? el("span", { class: "dist" }, u.d < 1 ? "here" : Math.round(u.d) + " mi") : el("span"));
@@ -231,11 +226,11 @@ function renderMap(list) {
   list.filter(hasCoords).forEach((u) => {
     const h = has(u), c = cssVar(`--r-${u.region}`) || cssVar("--ink");
     const m = L.circleMarker([u.lat, u.lon], {
-      radius: u.type === "NP" ? 8 : 6, weight: u.custom ? 3 : 2, dashArray: u.custom ? "2 3" : null,
+      radius: u.type === "NP" ? 8 : 6, weight: 2,
       color: c, fillColor: h ? c : surface, fillOpacity: 1,
     });
     const btn = el("button", { class: "linkish", type: "button", onclick: () => openSheet(u.key) }, h ? "Open" : "Open and check off");
-    m.bindPopup(el("div", {}, el("b", {}, u.name), el("div", {}, `${u.custom ? u.kind || "Your place" : TYPES[u.type].label} · ${u.st} · ${regionName(u.region)}`), btn));
+    m.bindPopup(el("div", {}, el("b", {}, u.name), el("div", {}, `${TYPES[u.type].label} · ${u.st} · ${regionName(u.region)}`), btn));
     m.bindTooltip(u.name);
     markerLayer.addLayer(m);
     pts.push([u.lat, u.lon]);
@@ -273,18 +268,17 @@ function armButton(btn, label, action) {
 
 function renderSheet() {
   if (S.open == null) return;
-  if (S.open === "__add") return renderAddPlace();
   if (S.open === "__list") return renderListSettings();
   const u = unitByKey(S.open);
   if (!u) { closeSheet(); return; }
   const vs = visitsFor(u.key);
   const nearest = hasCoords(u) ? NPS_UNITS.filter((x) => x.key !== u.key).map((x) => ({ ...x, d: miles(u, x) })).sort((a, b) => a.d - b.d).slice(0, 5) : [];
-  const mapsQ = hasCoords(u) && !u.custom ? encodeURIComponent(u.name) : encodeURIComponent(`${u.name} ${STATE_NAMES[u.st] || ""}`);
+  const mapsQ = hasCoords(u) ? encodeURIComponent(u.name) : encodeURIComponent(`${u.name} ${STATE_NAMES[u.st] || ""}`);
   $("#sheet").replaceChildren(...[
     el("button", { class: "btn close", type: "button", onclick: closeSheet }, "Close"),
     el("div", { class: "sheet-head", style: `--rc:${regionColor(u.region)}` },
       u.region ? el("span", { class: "rdot" }, regionName(u.region) + " region") : null,
-      el("div", { class: "eyebrow" }, [u.custom ? u.kind || "Your place" : TYPES[u.type].label, STATE_NAMES[u.st] || u.st, u.code].filter(Boolean).join(" · ")),
+      el("div", { class: "eyebrow" }, [TYPES[u.type].label, STATE_NAMES[u.st] || u.st, u.code].filter(Boolean).join(" · ")),
       el("h3", { id: "sheetTitle", style: "margin-top:6px" }, u.name)),
     el("div", { class: "row" },
       u.code ? el("a", { href: `https://www.nps.gov/${u.code.toLowerCase()}/index.htm`, target: "_blank", rel: "noopener" }, "Park website ↗") : null,
@@ -306,13 +300,6 @@ function renderSheet() {
       el("ul", { class: "units" }, nearest.map((x) => el("li", { class: "unit", style: "grid-template-columns:1fr auto", onclick: () => openSheet(x.key) },
         el("div", { class: "nm" }, x.name, el("div", { class: "meta" }, has(x) ? el("span", { class: "tag np" }, "have") : el("span", { class: "tag" }, "need"))),
         el("span", { class: "dist" }, Math.round(x.d) + " mi"))))) : null,
-    u.custom ? el("button", { class: "btn danger", type: "button", onclick: (e) => armButton(e.target, "Tap again to remove", async () => {
-      try {
-        for (const v of visitsFor(u.key)) await S.store.remove("visits", v.id);
-        if (stampFor(u.key)) await S.store.remove("stamps", u.key);
-        await S.store.remove("places", u.key.slice(2)); closeSheet();
-      } catch (x) { saveFailed(x); }
-    }) }, "Remove this place") : null,
   ].filter(Boolean));
 }
 
@@ -360,33 +347,6 @@ function visitForm(u) {
     el("div", { class: "row" }, el("button", { class: "btn primary", type: "submit" }, ed ? "Save changes" : "Save visit"),
       ed ? el("button", { class: "btn", type: "button", onclick: () => { S.editing = null; renderSheet(); } }, "Cancel") : null));
   return f;
-}
-
-function renderAddPlace() {
-  const err = el("div", { class: "err", role: "status" });
-  const f = el("form", { class: "log", onsubmit: async (e) => {
-      e.preventDefault();
-      const name = f.pname.value.trim();
-      if (!name) { err.textContent = "Give the place a name."; return; }
-      const ref = NPS_UNITS.find((x) => x.name === f.pnear.value);
-      const loc = f.puseMe.checked && S.here ? S.here : ref;
-      try {
-        const id = await S.store.add("places", { name, kind: f.pkind.value, st: f.pst.value, lat: loc ? loc.lat : null, lon: loc ? loc.lon : null });
-        openSheet("x-" + id);
-      } catch (x) { saveFailed(x, err); }
-    } },
-    el("label", {}, "Name", el("input", { class: "field", name: "pname", id: "pname", required: true, placeholder: "Pisgah National Forest" })),
-    el("label", {}, "Kind", el("select", { class: "field", name: "pkind", id: "pkind" }, ["National Forest", "State Park", "Wildlife Refuge", "BLM Land", "Other"].map((k) => el("option", {}, k)))),
-    el("label", {}, "State", el("select", { class: "field", name: "pst", id: "pst" }, Object.keys(STATE_NAMES).sort((a, b) => STATE_NAMES[a].localeCompare(STATE_NAMES[b])).map((k) => el("option", { value: k }, STATE_NAMES[k])))),
-    el("label", {}, "Where is it? Pick the closest park site (optional)", el("input", { class: "field", name: "pnear", id: "pnear", list: "nearList" })),
-    el("label", { style: "display:flex;gap:8px;align-items:center;font-weight:500" + (S.here ? "" : ";display:none") },
-      el("input", { type: "checkbox", name: "puseMe", id: "puseMe" }), "Use my current location instead"),
-    err, el("button", { class: "btn primary", type: "submit" }, "Add place"));
-  $("#sheet").replaceChildren(
-    el("button", { class: "btn close", type: "button", onclick: closeSheet }, "Close"),
-    el("h3", { id: "sheetTitle" }, "Add a place"),
-    el("p", { class: "lede", style: "margin:0" }, "For spots outside the National Park Service, like national forests or state parks. They show up under “Your places.”"),
-    f);
 }
 
 /* ---------- where to get the stamp, and alerts ---------- */
@@ -548,7 +508,6 @@ function setupControls() {
   $("#scrim").addEventListener("click", closeSheet);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.open) closeSheet(); });
   $("#updateListBtn").addEventListener("click", () => { S.open = "__list"; renderSheet(); $("#sheet").hidden = false; $("#scrim").hidden = false; });
-  $("#addPlaceBtn").addEventListener("click", () => { S.open = "__add"; renderSheet(); $("#sheet").hidden = false; $("#scrim").hidden = false; });
 }
 function setFiltersOpen(open) {
   $("#filterPanel").hidden = !open;
@@ -618,7 +577,7 @@ function authMessage(e) {
 }
 function onUser(user) {
   S.unsubs.forEach((u) => u()); S.unsubs = [];
-  S.visits = []; S.stamps = []; S.places = [];
+  S.visits = []; S.stamps = [];
   applyMeta([]); applyShared(null);
   S.user = user;
   $("#updateListRow").hidden = !(user && S.store.isOwner);
@@ -634,7 +593,7 @@ function onUser(user) {
     acct.replaceChildren(el("span", {}, "Signed in as " + (user.email || user.name)),
       el("button", { class: "linkish", type: "button", onclick: () => S.store.signOut() }, "Sign out"));
   }
-  for (const name of ["visits", "stamps", "places"]) {
+  for (const name of ["visits", "stamps"]) {
     S.unsubs.push(S.store.subscribe(name, (rows) => { S[name] = rows; scheduleRender(); },
       (e) => saveFailed(e)));
   }
@@ -672,8 +631,8 @@ function scheduleRender() {
     queued = false; render();
     // Don't redraw the sheet while someone is typing in it.
     const typing = $("#sheet").contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && document.activeElement.type !== "checkbox";
-    // The add-place and park-list pages are forms with their own progress messages; leave them be.
-    const formPage = S.open === "__add" || S.open === "__list";
+    // The park-list page is a form with its own progress messages; leave it be.
+    const formPage = S.open === "__list";
     if (S.open && !S.editing && !typing && !formPage) renderSheet();
   });
 }

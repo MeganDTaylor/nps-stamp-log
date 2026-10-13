@@ -7,7 +7,6 @@ A personal checklist for National Park Service passport stamps. Each person sign
 - **Visit journal** with date, who you went with, notes and a rating.
 - **Map view** of every site (filled = have, hollow = still need).
 - **Near me** uses your phone's location to list the closest sites, or pick any park to see what's near it.
-- **Your own places**, such as national forests and state parks, which aren't part of the passport program.
 - **Where to get the stamp:** every stamp location the Park Service lists (1,190+), with where in the building it is, today's hours and directions.
 - **Live alerts** (closures, cautions) on each park page once you've saved your NPS API key.
 - **Update park list** from the National Park Service with your own API key, whenever you like.
@@ -69,15 +68,16 @@ The nine region colors are set once at the top of `public/css/app.css` (`--r-NA`
 
 ## Data layout
 
-Everything a person saves lives under their own user id, and `firestore.rules` only lets them read and write their own:
+Everything a person saves lives under their own user id, and `firestore.rules` only lets them read and write their own. The one exception is `shared/units`, which everyone signed in can read and only the owner can write:
 
 ```
 users/{uid}/stamps/{unit} { date: "2026-10-13" }          (one doc per site you have)
 users/{uid}/visits/{id}   { unit: "YELL", date: "2026-10-13", with: "", notes: "…", rating: "Great" }
-users/{uid}/places/{id}   { name: "Pisgah National Forest", kind: "National Forest", st: "NC", lat, lon }
+users/{uid}/meta/settings { npsKey: "…" }                 (your NPS API key, optional)
+shared/units              { json: "[…]", refreshedAt, count } (the owner's refreshed park list; everyone reads it)
 ```
 
-`unit` (and the stamp doc id) is the NPS four-letter park code, or `x-{placeId}` for your own places.
+`unit` (and the stamp doc id) is the NPS four-letter park code.
 
 ## Testing locally with the emulators
 
