@@ -8,6 +8,9 @@ A personal checklist for National Park Service passport stamps. Each person sign
 - **Map view** of every site (filled = have, hollow = still need).
 - **Near me** uses your phone's location to list the closest sites, or pick any park to see what's near it.
 - **Your own places**, such as national forests and state parks, which aren't part of the passport program.
+- **Where to get the stamp:** every stamp location the Park Service lists (1,190+), with where in the building it is, today's hours, directions, and often a photo of the stamp.
+- **Park details:** photo, description and entrance fees.
+- **Live alerts** (closures, cautions) on each park page once you've saved your NPS API key.
 - **Update park list** from the National Park Service with your own API key, whenever you like.
 
 No build step: plain HTML, CSS and JavaScript modules, with Firebase Auth + Firestore for accounts and data, and Leaflet + OpenStreetMap for the map.
@@ -23,23 +26,43 @@ cd public && python3 -m http.server 5000
 
 ## Put it on Firebase
 
-1. In the [Firebase console](https://console.firebase.google.com), create a project (or reuse one).
-2. **Authentication → Sign-in method:** turn on **Email/Password** and **Google**.
-3. **Firestore Database → Create database** (production mode).
-4. **Project settings → Your apps → Add app → Web.** Copy the config values into `public/js/firebase-config.js`.
-   These values are safe to commit; the security rules are what protect the data.
-5. Deploy:
+You do steps 1–5 once, in the browser. Step 6 is on your computer.
+
+1. **Create the project.** Go to the [Firebase console](https://console.firebase.google.com) → **Add project** (or open an existing one). Google Analytics is optional; you can turn it off.
+2. **Turn on sign-in.** **Build → Authentication → Get started → Sign-in method.**
+   - **Email/Password:** Enable (leave "Email link" off) → Save.
+   - **Google:** Enable → pick your email as the support email → Save.
+3. **Create the database.** **Build → Firestore Database → Create database.** Pick a location near you (for example `us-central1` or `nam5`). This can't be changed later. Start in **production mode**; the deploy in step 6 installs this app's rules.
+4. **Register the web app.** **Project settings** (gear icon) → **Your apps** → the **</>** (Web) button → nickname "Stamp Trail". Leave "Also set up Firebase Hosting" unchecked; step 6 does that. Copy the `firebaseConfig` values it shows into `public/js/firebase-config.js`. They aren't secret; the security rules are what protect the data.
+5. **Billing:** the free Spark plan covers this app. No card needed.
+6. **Deploy** from the project folder on your computer (needs [Node.js](https://nodejs.org) 18 or newer):
 
    ```sh
    npm install -g firebase-tools
    firebase login
-   firebase use --add          # pick your project
+   firebase use --add          # pick the project from step 1, alias "default"
    firebase deploy --only hosting,firestore:rules
    ```
 
-6. After the first deploy, add your hosting domain under **Authentication → Settings → Authorized domains** if it isn't already listed (`*.web.app` and `*.firebaseapp.com` are added automatically).
+   It prints your site address, like `https://your-project.web.app`.
+7. Open the site, create your account, then tap **Update park list**, paste your NPS key, and tap **Refresh**. That saves your key so park pages show live alerts.
+
+`*.web.app` and `*.firebaseapp.com` are already allowed for sign-in. If you add a custom domain later, add it under **Authentication → Settings → Authorized domains**.
 
 "Use my location" needs HTTPS, which Firebase Hosting provides. On `localhost` it works too.
+
+### Updating the site later
+
+Change files, then run `firebase deploy --only hosting` again (add `firestore:rules` if `firestore.rules` changed).
+
+## GitHub
+
+```sh
+git remote add origin https://github.com/<you>/stamp-trail.git
+git push -u origin main
+```
+
+`.env` (your NPS key) is git-ignored and never pushed. `public/js/firebase-config.js` and `.firebaserc` are fine to commit.
 
 ## Region colors
 
@@ -71,11 +94,13 @@ Then fill in any non-empty `apiKey` with `projectId: "demo-stamptrail"` and set 
 
 ## The park list
 
-The built-in list (`public/js/units.js`, 474 sites) comes from the official [NPS Data API](https://www.nps.gov/subjects/developer/api-documentation.htm).
+The built-in list (`public/js/units.js`, 474 sites) and park details with stamp locations (`public/data/park-info.json`) come from the official [NPS Data API](https://www.nps.gov/subjects/developer/api-documentation.htm).
 
 **Refreshing it from the app:** tap **Update park list** at the bottom of the page, paste your NPS API key once, and tap **Refresh park list**. The app downloads the latest sites, saves your copy to your account (`users/{uid}/meta/units`), and tells you what was added or removed. Your key is saved privately to your account (`users/{uid}/meta/settings`). Stamps and journal entries are tied to park codes, so a refresh never loses them.
 
-**Refreshing the built-in list** (what new accounts start with):
+**Park pages with your key:** when you open a park, the app fetches that park's stamp locations, visitor center hours and alerts live (4 small requests, cached for 30 minutes). Without a key, park pages use the built-in copy and skip alerts.
+
+**Refreshing the built-in list and park details** (what everyone starts with):
 
 ```sh
 echo "NPS_API_KEY=your-key" > .env     # .env is git-ignored

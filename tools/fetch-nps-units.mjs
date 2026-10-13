@@ -1,4 +1,5 @@
-// Rebuilds the built-in park list (public/js/units.js) from the official NPS Data API.
+// Rebuilds the built-in park list (public/js/units.js) and park details with stamp locations
+// (public/data/park-info.json) from the official NPS Data API.
 // You can also refresh your own list from inside the app: "Update park list" at the bottom of the page.
 //
 //   1. Put your key in a file named .env at the project root:  NPS_API_KEY=your-key
@@ -6,13 +7,14 @@
 //   2. node tools/fetch-nps-units.mjs
 //
 // Run it again whenever you want to pick up new park sites. It prints what was added and removed.
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { fetchParks, buildList } from "../public/js/nps.js";
+import { fetchParks, fetchAll, buildList, buildParkInfo } from "../public/js/nps.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(root, "public/js/units.js");
+const INFO = join(root, "public/data/park-info.json");
 
 function readKey() {
   if (process.env.NPS_API_KEY) return process.env.NPS_API_KEY.trim();
@@ -25,7 +27,12 @@ function readKey() {
 }
 
 async function main() {
-  const parks = await fetchParks(readKey());
+  const key = readKey();
+  const progress = (what) => (n, total) => process.stdout.write(`\r${what}: ${n} of ${total}   `);
+  const parks = await fetchParks(key, progress("Parks"));
+  const stampLocations = await fetchAll(key, "passportstamplocations", progress("\nStamp locations"));
+  const visitorCenters = await fetchAll(key, "visitorcenters", progress("\nVisitor centers"));
+  console.log("\n");
   const oldCodes = new Set([...readFileSync(OUT, "utf8").matchAll(/^\["([A-Z0-9]+)"/gm)].map((m) => m[1]));
   const { rows, added, removed, skipped } = buildList(parks, oldCodes);
 
@@ -33,7 +40,13 @@ async function main() {
     "// Fields: code, name, type, state, lat, lon, region override (optional). Don't edit by hand; rerun the script.\n";
   writeFileSync(OUT, header + "export const RAW_UNITS = [\n" + rows.map((r) => JSON.stringify(r)).join(",\n") + "\n];\n");
 
+  const info = buildParkInfo(parks, stampLocations, visitorCenters);
+  mkdirSync(dirname(INFO), { recursive: true });
+  writeFileSync(INFO, JSON.stringify(info));
+  const spots = Object.values(info).reduce((n, v) => n + v.stamps.length, 0);
+
   console.log(`Wrote ${rows.length} sites to public/js/units.js (the API listed ${parks.length}).`);
+  console.log(`Wrote park details and ${spots} stamp locations to public/data/park-info.json (${Math.round(JSON.stringify(info).length / 1024)} KB).`);
   if (added.length) console.log(`\nNew since last list (${added.length}):\n  ` + added.join("\n  "));
   if (removed.length) console.log(`\nNo longer listed (${removed.length}): ${removed.join(", ")}`);
   if (skipped.length) console.log(`\nSkipped, missing a state or location (${skipped.length}):\n  ` + skipped.join("\n  "));

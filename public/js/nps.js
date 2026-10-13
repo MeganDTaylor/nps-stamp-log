@@ -56,22 +56,89 @@ export function toRow(p) {
   return row;
 }
 
-// Fetches every park from the API. onProgress(done, total) is called after each page.
-export async function fetchParks(key, onProgress) {
-  const parks = [];
+const API = "https://developer.nps.gov/api/v1/";
+
+async function getJSON(key, path) {
+  let res;
+  try { res = await fetch(API + path, { headers: { "X-Api-Key": key, Accept: "application/json" } }); }
+  catch { throw new Error("Couldn't reach the National Park Service. Check your connection and try again."); }
+  if (res.status === 401 || res.status === 403) throw new Error("The NPS didn't accept that API key. Check it and try again.");
+  if (res.status === 429) throw new Error("Too many requests with this key right now. Wait an hour and try again.");
+  if (!res.ok) throw new Error(`The NPS answered with an error (${res.status}). Try again later.`);
+  return res.json();
+}
+
+// Fetches every record from one endpoint, 100 at a time. onProgress(done, total) runs after each page.
+export async function fetchAll(key, endpoint, onProgress, params = "") {
+  const out = [];
   for (let start = 0; ; start += 100) {
-    const url = `https://developer.nps.gov/api/v1/parks?limit=100&start=${start}&fields=`;
-    let res;
-    try { res = await fetch(url, { headers: { "X-Api-Key": key, Accept: "application/json" } }); }
-    catch { throw new Error("Couldn't reach the National Park Service. Check your connection and try again."); }
-    if (res.status === 401 || res.status === 403) throw new Error("The NPS didn't accept that API key. Check it and try again.");
-    if (res.status === 429) throw new Error("Too many requests with this key right now. Wait an hour and try again.");
-    if (!res.ok) throw new Error(`The NPS answered with an error (${res.status}). Try again later.`);
-    const body = await res.json();
-    parks.push(...body.data);
-    onProgress?.(parks.length, Number(body.total));
-    if (parks.length >= Number(body.total) || body.data.length === 0) return parks;
+    const body = await getJSON(key, `${endpoint}?limit=100&start=${start}${params}`);
+    out.push(...body.data);
+    onProgress?.(out.length, Number(body.total));
+    if (out.length >= Number(body.total) || body.data.length === 0) return out;
   }
+}
+export const fetchParks = (key, onProgress) => fetchAll(key, "parks", onProgress);
+
+/* ---------- park details: photo, description, fees, and where the stamps are ---------- */
+const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const clip = (s, n) => { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, s.lastIndexOf(" ", n)) + "…" : s; };
+
+function stampSpot(loc, vc, code) {
+  const spot = { n: loc.label, t: loc.type === "visitorcenters" ? "vc" : "place" };
+  if (vc) {
+    const lat = Number.parseFloat(vc.latitude), lon = Number.parseFloat(vc.longitude);
+    if (!Number.isNaN(lat) && !Number.isNaN(lon)) { spot.lat = +lat.toFixed(5); spot.lon = +lon.toFixed(5); }
+    if (vc.url) spot.url = vc.url;
+    if (vc.passportStampLocationDescription) spot.where = clip(vc.passportStampLocationDescription, 220);
+    const img = vc.passportStampImages?.[0]?.url;
+    if (img) spot.simg = img;
+    const oh = vc.operatingHours?.[0];
+    if (oh?.standardHours) spot.hours = DAYS.map((d) => oh.standardHours[d] || "");
+    else if (oh?.description) spot.hoursNote = clip(oh.description, 160);
+  }
+  if (/temporarily closed/i.test(loc.label)) spot.closed = true;
+  return spot;
+}
+
+// One entry per park code: { d, img, fees, url, stamps: [...] }
+export function buildParkInfo(parks, stampLocations, visitorCenters) {
+  const vcById = new Map(visitorCenters.map((v) => [v.id, v]));
+  const info = {};
+  for (const p of parks) {
+    const code = String(p.parkCode || "").toUpperCase();
+    if (!code) continue;
+    const img = p.images?.[0];
+    info[code] = {
+      d: clip(p.description, 420),
+      url: p.url || "",
+      img: img?.url ? { u: img.url, a: img.altText || img.title || "", c: img.credit || "" } : null,
+      fees: (p.entranceFees || []).filter((f) => f.title).slice(0, 3).map((f) => [f.title.replace(/^Entrance - /, ""), Number(f.cost) || 0]),
+      stamps: [],
+    };
+  }
+  for (const loc of stampLocations) {
+    for (const park of loc.parks || []) {
+      const code = String(park.parkCode || "").toUpperCase();
+      (info[code] ||= { d: "", url: park.url || "", img: null, fees: [], stamps: [] }).stamps.push(stampSpot(loc, vcById.get(loc.id), code));
+    }
+  }
+  for (const v of Object.values(info)) v.stamps.sort((a, b) => (a.closed ? 1 : 0) - (b.closed ? 1 : 0) || a.n.localeCompare(b.n));
+  return info;
+}
+
+// Everything for one park, straight from the NPS (used when you've saved an API key).
+export async function fetchParkLive(key, code) {
+  const c = code.toLowerCase();
+  const [parks, locs, vcs, alerts] = await Promise.all([
+    getJSON(key, `parks?parkCode=${c}`), fetchAll(key, "passportstamplocations", null, `&parkCode=${c}`),
+    fetchAll(key, "visitorcenters", null, `&parkCode=${c}`), getJSON(key, `alerts?parkCode=${c}&limit=20`),
+  ]);
+  const info = buildParkInfo(parks.data, locs, vcs)[code.toUpperCase()] || null;
+  return {
+    info,
+    alerts: alerts.data.map((a) => ({ title: a.title, cat: a.category, d: clip(a.description, 300), url: a.url || "" })),
+  };
 }
 
 // Builds the sorted park list, plus what changed compared with the codes you had before.

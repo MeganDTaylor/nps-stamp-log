@@ -1,7 +1,7 @@
 import { RAW_UNITS } from "./units.js";
 import { createStore } from "./store.js";
 import { US_STATES } from "./us-states.js";
-import { fetchParks, buildList } from "./nps.js";
+import { fetchParks, buildList, fetchParkLive } from "./nps.js";
 
 /* ---------- reference data ---------- */
 const TYPES = {
@@ -38,6 +38,8 @@ const S = {
   store: null, user: null, unsubs: [],
   visits: [], stamps: [], places: [],
   list: null, npsKey: "", // list: {refreshedAt, count} when using a list refreshed from the NPS
+  info: null, infoState: "idle", // park details and stamp locations, from data/park-info.json
+  live: {}, // per park code: {state, info, alerts, at} fetched from the NPS with your key
   f: { q: "", state: "", status: "all", types: new Set(), region: "", near: null, radius: 250 },
   view: "list", here: null, open: null, editing: null, fresh: null,
 };
@@ -251,7 +253,9 @@ function renderMap(list) {
 
 /* ---------- park sheet ---------- */
 function openSheet(key) {
-  S.open = key; S.editing = null; renderSheet();
+  S.open = key; S.editing = null;
+  loadInfo(); loadLive(unitByKey(key)?.code);
+  renderSheet();
   $("#sheet").hidden = false; $("#scrim").hidden = false; $("#sheet").focus();
   map?.closePopup();
 }
@@ -282,7 +286,10 @@ function renderSheet() {
       u.code ? el("a", { href: `https://www.nps.gov/${u.code.toLowerCase()}/index.htm`, target: "_blank", rel: "noopener" }, "Park website ↗") : null,
       el("a", { href: `https://www.google.com/maps/search/?api=1&query=${mapsQ}`, target: "_blank", rel: "noopener" }, "Directions ↗"),
       S.here && hasCoords(u) ? el("span", { class: "dist" }, `${Math.round(miles(S.here, u))} mi from you`) : null),
+    alertsSection(u),
     stampCard(u),
+    whereSection(u),
+    aboutSection(u),
     el("div", { class: "eyebrow" }, vs.length ? `Visit journal (${vs.length})` : "Visit journal"),
     ...vs.map((v) => el("div", { class: "card visit" },
       el("div", { class: "d" }, fmtDate(v.date) + (v.rating ? " · " + v.rating : "")),
@@ -377,6 +384,92 @@ function renderAddPlace() {
     el("h3", { id: "sheetTitle" }, "Add a place"),
     el("p", { class: "lede", style: "margin:0" }, "For spots outside the National Park Service, like national forests or state parks. They show up under “Your places.”"),
     f);
+}
+
+/* ---------- park details ---------- */
+async function loadInfo() {
+  if (S.infoState !== "idle") return;
+  S.infoState = "loading";
+  try {
+    const res = await fetch("data/park-info.json");
+    if (!res.ok) throw new Error(res.status);
+    S.info = await res.json(); S.infoState = "ok";
+  } catch (e) { console.warn("Park details didn't load", e); S.infoState = "error"; }
+  if (S.open && !S.open.startsWith("__")) renderSheet();
+}
+const LIVE_MAX_AGE = 30 * 60 * 1000;
+function loadLive(code) {
+  if (!S.npsKey || !code) return;
+  const cur = S.live[code];
+  if (cur && (cur.state === "loading" || Date.now() - cur.at < LIVE_MAX_AGE)) return;
+  S.live[code] = { state: "loading", at: Date.now() };
+  fetchParkLive(S.npsKey, code)
+    .then((r) => { S.live[code] = { state: "ok", at: Date.now(), ...r }; })
+    .catch((e) => { S.live[code] = { state: "error", at: Date.now(), msg: e.message }; })
+    .finally(() => { if (S.open === code) renderSheet(); });
+}
+// Live details when you have a key, otherwise the copy that ships with the app.
+const infoFor = (u) => (u.code ? S.live[u.code]?.info || S.info?.[u.code] || null : null);
+
+function alertsSection(u) {
+  if (!u.code || !S.npsKey) return null;
+  const live = S.live[u.code];
+  if (!live || live.state === "loading") return el("div", { class: "hint" }, "Checking for alerts and closures…");
+  if (live.state === "error") return el("div", { class: "hint" }, "Couldn't check for alerts right now. " + (live.msg || ""));
+  if (!live.alerts.length) return el("div", { class: "hint" }, "No current alerts for this park.");
+  const severe = live.alerts.filter((a) => /closure|danger/i.test(a.cat)).length;
+  const n = live.alerts.length;
+  return el("details", { class: "alerts" + (severe ? " has-severe" : "") },
+    el("summary", {}, `${n} alert${n === 1 ? "" : "s"}` + (severe ? ` · ${severe} closure${severe === 1 ? "" : "s"} or danger` : "")),
+    live.alerts.map((a) => el("details", { class: "alert" + (/closure|danger/i.test(a.cat) ? " severe" : "") },
+      el("summary", {}, el("span", { class: "acat" }, a.cat || "Alert"), a.title),
+      el("p", {}, a.d), a.url ? el("a", { href: a.url, target: "_blank", rel: "noopener" }, "More on nps.gov ↗") : null)));
+}
+
+const todayIdx = () => new Date().getDay();
+function whereSection(u) {
+  if (!u.code) return null;
+  const info = infoFor(u);
+  if (!info) {
+    return S.infoState === "loading" || S.infoState === "idle" ? el("div", { class: "hint" }, "Loading where to find the stamp…")
+      : S.infoState === "error" ? el("div", { class: "hint" }, "Couldn't load stamp locations. Check your connection and reopen this park.") : null;
+  }
+  if (!info.stamps.length) {
+    return el("div", { class: "card" }, el("div", { class: "eyebrow" }, "Where to get the stamp"),
+      el("p", { class: "hint", style: "margin:0" }, "The Park Service doesn't list a stamp location for this site. Ask at the visitor center or check the park website."));
+  }
+  const list = el("ul", { class: "spots" });
+  const LIMIT = 3, many = info.stamps.length > LIMIT;
+  const draw = (all) => list.replaceChildren(...info.stamps.slice(0, all ? undefined : LIMIT).map((s) => spotItem(u, s)));
+  draw(false);
+  return el("div", { class: "card" },
+    el("div", { class: "eyebrow" }, info.stamps.length === 1 ? "Where to get the stamp" : `Where to get the stamps (${info.stamps.length} spots)`),
+    list,
+    many ? el("button", { class: "linkish", type: "button", style: "justify-self:start", onclick: (e) => { draw(true); e.target.remove(); } }, `Show all ${info.stamps.length}`) : null);
+}
+function spotItem(u, s) {
+  const today = s.hours?.[todayIdx()];
+  const dir = s.lat != null ? `${s.lat},${s.lon}` : `${s.n} ${u.name}`;
+  const img = s.simg ? el("img", { class: "stamp-img", src: s.simg, alt: `The ${s.n} stamp`, loading: "lazy", onerror: (e) => e.target.remove() }) : null;
+  return el("li", { class: "spot" + (s.closed ? " closed" : "") },
+    el("div", { class: "spot-body" },
+      el("div", { class: "spot-name" }, s.n.replace(/\s*\(Temporarily Closed\)/i, ""), s.closed ? el("span", { class: "tag warn" }, "Temporarily closed") : null),
+      s.where ? el("p", {}, s.where) : null,
+      today ? el("div", { class: "spot-hours" }, `Today: ${today}`) : s.hoursNote ? el("div", { class: "spot-hours" }, s.hoursNote) : null,
+      el("div", { class: "row spot-links" },
+        el("a", { href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dir)}`, target: "_blank", rel: "noopener" }, "Directions ↗"),
+        s.url ? el("a", { href: s.url, target: "_blank", rel: "noopener" }, "Hours & info ↗") : null)),
+    img);
+}
+function aboutSection(u) {
+  const info = infoFor(u);
+  if (!info || !(info.d || info.img || info.fees.length)) return null;
+  return el("div", { class: "card about" },
+    info.img ? el("figure", {}, el("img", { src: info.img.u, alt: info.img.a, loading: "lazy", onerror: (e) => e.target.closest("figure").remove() }),
+      info.img.c ? el("figcaption", {}, info.img.c) : null) : null,
+    info.d ? el("p", {}, info.d) : null,
+    info.fees.length ? el("div", { class: "fees" }, el("div", { class: "eyebrow" }, "Entrance fees"),
+      info.fees.map(([t, c]) => el("div", { class: "fee" }, el("span", {}, t), el("span", { class: "dist" }, c ? `$${c % 1 ? c.toFixed(2) : c}` : "Free")))) : null);
 }
 
 /* ---------- park list from the NPS ---------- */
