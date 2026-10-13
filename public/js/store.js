@@ -8,12 +8,14 @@ import { firebaseConfig, useEmulators } from "./firebase-config.js";
 const SDK = "https://www.gstatic.com/firebasejs/10.12.2";
 
 export async function createStore() {
-  if (firebaseConfig.apiKey) return new FirebaseStore(await loadFirebase());
+  // The claude.ai preview can't load Firebase, so it keeps its own storage even when Firebase is configured.
   if (window.claude?.use) {
     const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
     const uid = db && user ? await user.id() : null;
     if (uid) return new ArtifactStore(db, uid);
+    return new LocalStore();
   }
+  if (firebaseConfig.apiKey) return new FirebaseStore(await loadFirebase());
   return new LocalStore();
 }
 
