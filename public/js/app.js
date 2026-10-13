@@ -25,7 +25,6 @@ const STATE_NAMES = { AK: "Alaska", AL: "Alabama", AR: "Arkansas", AS: "American
 // Region colors live in css/app.css as --r-NA, --r-MA, ... so they can be matched to the passport book in one place.
 const regionColor = (k) => (k ? `var(--r-${k})` : "var(--ink)");
 const regionName = (k) => (REGIONS.find((r) => r[0] === k) || [])[1] || "";
-const RATINGS = ["Quick stop", "Good", "Great", "Unforgettable"];
 const ME = "__me";
 
 // Regions are worked out here rather than trusted from the saved list, so a fix to NATIONAL_CAPITAL applies
@@ -38,12 +37,12 @@ let NPS_UNITS = toUnits(RAW_UNITS);
 /* ---------- state ---------- */
 const S = {
   store: null, user: null, unsubs: [],
-  visits: [], stamps: [],
+  stamps: [],
   list: null, npsKey: "", // list: {refreshedAt, count} when using a list refreshed from the NPS
   info: null, infoState: "idle", // park details and stamp locations, from data/park-info.json
   live: {}, // per park code: {state, info, alerts, at} fetched from the NPS with your key
   f: { q: "", state: "", status: "all", types: new Set(), region: "", near: null, radius: 250 },
-  view: "list", here: null, open: null, editing: null, fresh: null,
+  view: "list", here: null, open: null, fresh: null,
 };
 
 /* ---------- helpers ---------- */
@@ -71,7 +70,6 @@ const hasCoords = (u) => u && typeof u.lat === "number" && !isNaN(u.lat) && type
 
 function allUnits() { return NPS_UNITS; }
 const unitByKey = (k) => allUnits().find((u) => u.key === k);
-const visitsFor = (key) => S.visits.filter((v) => v.unit === key).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 // One stamp per site, stored at stamps/{unit key} with the date it was collected.
 const stampFor = (key) => S.stamps.find((s) => s.id === key);
 const has = (u) => !!stampFor(u.key);
@@ -254,7 +252,7 @@ function renderMap(list) {
 
 /* ---------- park sheet ---------- */
 function openSheet(key) {
-  S.open = key; S.editing = null;
+  S.open = key;
   loadInfo(); loadLive(unitByKey(key)?.code);
   renderSheet();
   $("#sheet").hidden = false; $("#scrim").hidden = false; $("#sheet").focus();
@@ -273,7 +271,6 @@ function renderSheet() {
   if (S.open === "__list") return renderListSettings();
   const u = unitByKey(S.open);
   if (!u) { closeSheet(); return; }
-  const vs = visitsFor(u.key);
   const nearest = hasCoords(u) ? NPS_UNITS.filter((x) => x.key !== u.key).map((x) => ({ ...x, d: miles(u, x) })).sort((a, b) => a.d - b.d).slice(0, 5) : [];
   const mapsQ = hasCoords(u) ? encodeURIComponent(u.name) : encodeURIComponent(`${u.name} ${STATE_NAMES[u.st] || ""}`);
   $("#sheet").replaceChildren(...[
@@ -289,15 +286,6 @@ function renderSheet() {
     alertsSection(u),
     stampCard(u),
     whereSection(u),
-    el("div", { class: "eyebrow" }, vs.length ? `Visit journal (${vs.length})` : "Visit journal"),
-    ...vs.map((v) => el("div", { class: "card visit" },
-      el("div", { class: "d" }, fmtDate(v.date) + (v.rating ? " · " + v.rating : "")),
-      v.with ? el("div", { style: "font-size:13px;color:var(--muted)" }, "With " + v.with) : null,
-      v.notes ? el("p", {}, v.notes) : null,
-      el("div", { class: "acts" },
-        el("button", { class: "linkish", type: "button", onclick: () => { S.editing = v.id; renderSheet(); } }, "Edit"),
-        el("button", { class: "linkish", type: "button", style: "color:var(--warn)", onclick: (e) => armButton(e.target, "Tap again to delete", () => S.store.remove("visits", v.id).catch(saveFailed)) }, "Delete")))),
-    visitForm(u),
     nearest.length ? el("div", {}, el("div", { class: "eyebrow", style: "margin-bottom:6px" }, "Closest other sites"),
       el("ul", { class: "units" }, nearest.map((x) => el("li", { class: "unit", style: "grid-template-columns:1fr auto", onclick: () => openSheet(x.key) },
         el("div", { class: "nm" }, x.name, el("div", { class: "meta" }, has(x) ? el("span", { class: "tag np" }, "have") : el("span", { class: "tag" }, "need"))),
@@ -310,7 +298,7 @@ function stampCard(u) {
   if (!s) {
     return el("div", { class: "card stamp-card" },
       el("button", { class: "btn primary", type: "button", onclick: () => giveStamp(u.key).catch((x) => saveFailed(x, err)) }, "Got the stamp"),
-      el("span", { class: "hint" }, "Checks it off with today's date. Saving a visit below does this too."), err);
+      el("span", { class: "hint" }, "Checks it off with today's date. You can change the date afterward."), err);
   }
   const dateIn = el("input", { class: "field", type: "date", id: "stampDate", value: s.date || "", "aria-label": "Date stamped",
     onchange: (e) => S.store.set("stamps", u.key, { date: e.target.value || todayISO() }).catch((x) => saveFailed(x, err)) });
@@ -320,35 +308,6 @@ function stampCard(u) {
     el("button", { class: "linkish", type: "button", style: "color:var(--warn);justify-self:end",
       onclick: (e) => armButton(e.target, "Tap again to unmark", () => S.store.remove("stamps", u.key).catch((x) => saveFailed(x, err))) }, "Unmark"),
     err);
-}
-
-function visitForm(u) {
-  const ed = S.editing ? S.visits.find((v) => v.id === S.editing) : null;
-  let rating = ed?.rating || "";
-  const ratingBox = el("div", { class: "rating", role: "group", "aria-label": "How was it" }, RATINGS.map((r) =>
-    el("button", { type: "button", "aria-pressed": r === rating ? "true" : "false", onclick: () => {
-      rating = rating === r ? "" : r;
-      [...ratingBox.children].forEach((b) => b.setAttribute("aria-pressed", b.textContent === rating ? "true" : "false"));
-    } }, r)));
-  const err = el("div", { class: "err", role: "status" });
-  const f = el("form", { class: "log", onsubmit: async (e) => {
-      e.preventDefault();
-      const body = { unit: u.key, date: f.vdate.value || todayISO(), with: f.vwith.value.trim(), notes: f.vnotes.value.trim(), rating };
-      const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
-      try {
-        if (ed) await S.store.update("visits", ed.id, body); else await S.store.add("visits", body);
-        if (!stampFor(u.key)) await giveStamp(u.key, body.date);
-        S.editing = null; S.fresh = u.key; renderSheet();
-      } catch (x) { saveFailed(x, err); } finally { btn.disabled = false; }
-    } },
-    el("div", { class: "eyebrow" }, ed ? "Edit visit" : "Write about a visit"),
-    el("label", {}, "Date", el("input", { class: "field", type: "date", name: "vdate", id: "vdate", value: ed?.date || todayISO(), required: true })),
-    el("label", {}, "Who you went with (optional)", el("input", { class: "field", name: "vwith", id: "vwith", value: ed?.with || "", placeholder: "Sam, the dog…" })),
-    el("label", {}, "How did it go?", el("textarea", { class: "field", name: "vnotes", id: "vnotes", rows: "4", placeholder: "Saw a moose at dusk. The ranger talk was great.", value: ed?.notes || "" })),
-    ratingBox, err,
-    el("div", { class: "row" }, el("button", { class: "btn primary", type: "submit" }, ed ? "Save changes" : "Save visit"),
-      ed ? el("button", { class: "btn", type: "button", onclick: () => { S.editing = null; renderSheet(); } }, "Cancel") : null));
-  return f;
 }
 
 /* ---------- where to get the stamp, and alerts ---------- */
@@ -472,7 +431,7 @@ function renderListSettings() {
     f,
     S.list ? el("button", { class: "linkish", type: "button", style: "justify-self:start", onclick: (e) => armButton(e.target, "Tap again to switch back",
       () => S.store.removeShared("units").catch((x) => saveFailed(x, err))) }, "Go back to the built-in list") : null,
-    el("p", { class: "hint" }, "A refresh updates the list for everyone. It doesn't touch anyone's stamps or journal. They're tied to each park's code, which doesn't change."),
+    el("p", { class: "hint" }, "A refresh updates the list for everyone. It doesn't touch anyone's stamps. They're tied to each park's code, which doesn't change."),
   ].filter(Boolean));
 }
 
@@ -579,7 +538,7 @@ function authMessage(e) {
 }
 function onUser(user) {
   S.unsubs.forEach((u) => u()); S.unsubs = [];
-  S.visits = []; S.stamps = [];
+  S.stamps = [];
   applyMeta([]); applyShared(null);
   S.user = user;
   $("#updateListRow").hidden = !(user && S.store.isOwner);
@@ -595,7 +554,7 @@ function onUser(user) {
     acct.replaceChildren(el("span", {}, "Signed in as " + (user.email || user.name)),
       el("button", { class: "linkish", type: "button", onclick: () => S.store.signOut() }, "Sign out"));
   }
-  for (const name of ["visits", "stamps"]) {
+  for (const name of ["stamps"]) {
     S.unsubs.push(S.store.subscribe(name, (rows) => { S[name] = rows; scheduleRender(); },
       (e) => saveFailed(e)));
   }
@@ -635,7 +594,7 @@ function scheduleRender() {
     const typing = $("#sheet").contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && document.activeElement.type !== "checkbox";
     // The park-list page is a form with its own progress messages; leave it be.
     const formPage = S.open === "__list";
-    if (S.open && !S.editing && !typing && !formPage) renderSheet();
+    if (S.open && !typing && !formPage) renderSheet();
   });
 }
 

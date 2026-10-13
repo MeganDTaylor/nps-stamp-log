@@ -3,8 +3,7 @@
 A personal checklist for National Park Service passport stamps. Each person signs in and keeps their own list.
 
 - **Checklist** of 474 park sites with passport cancellations, grouped by state and color-coded by passport region.
-- **One tap to check off a site.** Tap the empty circle in the list (or "Got the stamp" on the park page). Saving a visit checks it off too.
-- **Visit journal** with date, who you went with, notes and a rating.
+- **One tap to check off a site.** Tap the empty circle in the list (or "Got the stamp" on the park page). Change the date on the park page.
 - **Map view** of every site (filled = have, hollow = still need).
 - **Near me** uses your phone's location to list the closest sites, or pick any park to see what's near it.
 - **Where to get the stamp:** every stamp location the Park Service lists (1,190+), with where in the building it is, today's hours and directions.
@@ -72,12 +71,11 @@ Everything a person saves lives under their own user id, and `firestore.rules` o
 
 ```
 users/{uid}/stamps/{unit} { date: "2026-10-13" }          (one doc per site you have)
-users/{uid}/visits/{id}   { unit: "YELL", date: "2026-10-13", with: "", notes: "…", rating: "Great" }
 users/{uid}/meta/settings { npsKey: "…" }                 (your NPS API key, optional)
 shared/units              { json: "[…]", refreshedAt, count } (the owner's refreshed park list; everyone reads it)
 ```
 
-`unit` (and the stamp doc id) is the NPS four-letter park code.
+The stamp doc id is the NPS four-letter park code.
 
 ## Testing locally with the emulators
 
